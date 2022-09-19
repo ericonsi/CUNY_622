@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 
 ```{r, include=FALSE}
 library(tidyverse)
-#devtools::install_github("ericonsi/EHData", force=TRUE)
+devtools::install_github("ericonsi/EHData", force=TRUE)
 library(EHData)
 library(patchwork)
 library(gridExtra)
@@ -36,6 +36,7 @@ library(class)
 ```{r}
 
 df2 <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_5000.csv")
+#df2 <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_50000.csv")
 
 ```
 
@@ -78,6 +79,13 @@ EHSummarize_SingleColumn_Histograms(df2)
 
 #grid.arrange(grobs=a2[c(1:7)], ncol=4)
 ```
+```{r}
+
+EHExplore_TwoCategoricalColumns_Barcharts(df2, "Region")
+
+```
+
+
 ```{r}
 
 ggplot(df2, aes(Item.Type)) +
@@ -132,8 +140,8 @@ df2$Units.Sold = log(df2$Units.Sold)
 df2$Total.Profit = log(df2$Total.Profit)
 
 # 1. Most reasonable guess
-#df3 <- df2 %>%
-#  dplyr::select(-Order.Date, -Ship.Date, -Order.Date2, -Ship.Date2, -Country, -Order.ID, #-Unit.Price, -Total.Revenue, -Total.Cost, -Unit.Cost)
+df3 <- df2 %>%
+    dplyr::select(-Order.Date, -Ship.Date, -Order.Date2, -Ship.Date2, -Country, -Order.ID, -Unit.Price, -Total.Revenue, -Total.Cost, -Unit.Cost)
 
 #2 Include all
 #df3 <- df2 %>%
@@ -141,8 +149,8 @@ df2$Total.Profit = log(df2$Total.Profit)
 
 
 #3 Get rid of type
-df3 <- df2 %>%
-  dplyr::select(-Order.Date, -Ship.Date, -Order.Date2, -Ship.Date2, -Country, -Order.ID, -Unit.Price, -Total.Revenue, -Total.Cost, -Unit.Cost, -Item.Type)
+#df3 <- df2 %>%
+#  dplyr::select(-Order.Date, -Ship.Date, -Order.Date2, -Ship.Date2, -Country, -Order.ID, -Unit.Price, -Total.Revenue, #-Total.Cost, -Unit.Cost, -Item.Type)
 
 z=list("Region")
 
@@ -209,7 +217,8 @@ dataset <- df4[validation_index,]
 
 EHSummarize_SingleColumn_Countplots(validation)
 
-EHSummarize_SingleColumn_Countplots(dataset)
+EHSummarize_SingleColumn_Countplots(validation)
+validation %>% count(Region)
 
 ```
 
@@ -225,8 +234,8 @@ fit.lda <- train(Region~., data=dataset, method="lda", metric=metric, trControl=
 # b) nonlinear algorithms
 # CART
 # a) linear algorithms
-set.seed(47)
-fit.qda <- train(Region~., data=dataset, method="qda", metric=metric, trControl=control)
+set.seed(8)
+#fit.qda <- train(Region~., data=dataset, method="qda", metric=metric, trControl=control)
 set.seed(7)
 fit.cart <- train(Region~., data=dataset, method="rpart", metric=metric, trControl=control)
 # kNN
@@ -236,7 +245,7 @@ fit.knn <- train(Region~., data=dataset, method="knn", metric=metric, trControl=
 # SVM
 set.seed(7)
 #fit.svm <- train(Region~., data=dataset, method="svmRadial", metric=metric, trControl=control)
-#fit.glm <- train(Region~., data=dataset, method="glm", metric=metric, trControl=control)
+fit.glm <- train(Region~., data=dataset, method="multinom", metric=metric, trControl=control)
 fit.nb <- train(Region~., data=dataset, method="nb", metric=metric, trControl=control)
 fit.nnet <- train(Region~., data=dataset, method="nnet", metric=metric, trControl=control)
 # Random Forest
@@ -262,7 +271,7 @@ mean(predicted.classes == dataset$Region)
 
 
 # summarize accuracy of models
-results <- resamples(list(lda=fit.lda, cart=fit.cart, nb=fit.nb, nnet=fit.nnet, qda=fit.qda, knn=fit.knn, rf=fit.rf))
+results <- resamples(list(lda=fit.lda, cart=fit.cart, nb=fit.nb, nnet=fit.nnet, multinom=fit.glm, knn=fit.knn, rf=fit.rf))
 summary(results)
 ```
 
@@ -275,12 +284,12 @@ dotplot(results)
 ```{r}
 
 # summarize Best Model
-print(fit.knn)
+print(fit.rf)
 ```
 ```{r}
 
 # estimate skill of LDA on the validation dataset
-predictions <- predict(fit.nnet, validation)
+predictions <- predict(fit.rf, validation)
 x <- factor(validation$Region)
 confusionMatrix(predictions, x)
 
