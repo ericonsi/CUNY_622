@@ -191,6 +191,16 @@ df3a$Units.Sold <- scale(df2$Units.Sold)
 df3b <- EHPrepare_CreateDummies(df3a, exclude=z, dropFirst=TRUE)
 df4 <- EHPrepare_ScaleAllButTarget(df3b, "Item.Type")
 
+
+df4q <- df4 %>%
+ slice(which(row_number() %% 100 == 1)) %>%
+  mutate(Item.Type = ifelse(Item.Type=="Snacks"|Item.Type=="Meat"|Item.Type=="Baby Food", "Snacks", "Other"))
+
+df5q <- df4q %>%
+  dplyr::select(Total.Profit, Units.Sold, Item.Type)
+
+write_tsv(df5q, "xqjgjk.tsv")
+
 ```
 
 
