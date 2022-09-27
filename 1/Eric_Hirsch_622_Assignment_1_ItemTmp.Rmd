@@ -113,6 +113,7 @@ grid.arrange(grobs=a[c(1:4)])
 a <- EHSummarize_SingleColumn_Boxplots(df3)
 grid.arrange(grobs=a[2])
 ```
+
 #### D. Relationships
 
 We can run a regression on total profit just to get an idea of some of the relationships between the numeric and categorical variables.  We can see from this exploration that item types are strongly correlated with profits, as are medium priority items, but nothing else is. Unit cost could not be calculated because of singularities. We know Unit Cost is not fully correlated with Total Profit, so it must be fully correlated with another variable or in conjunction with other variables.
@@ -210,7 +211,7 @@ write_tsv(df5q, "xqjgjk.tsv")
 ### 2. Models
 
 
-##### A. Preparing the data
+#### A. Preparing the data
 
 The data needs to be partitioned into a training set and an evaluation set. We examine our classes in the training set and see that they are relatively uniform.
 ```{r}
@@ -230,133 +231,16 @@ A number of factors weigh in to our decision of which models to choose.  We know
 
 We will use 10-fold cross validation.
 
-```{r, messages=FALSE}
-
-tc <- trainControl(method="cv", number=10)
-metric <- "Accuracy"
-
-set.seed(042760)
-multinom <- train(Item.Type~., data=dfTrain, method="multinom", metric=metric, trControl=tc)
-rf <- train(Item.Type~., data=dfTrain, method="rf", metric=metric, trControl=tc)
-```
-
-```{r}
-
-results <- resamples(list(Multinomial=multinom, RandomForest=rf))
-summary(results)
-dotplot(results)
-```
 Random Forest performs quite well.  Mean accuracy is 88% at mtry = 14.  Now we test our random forest model on the evaluation set.  We see that certain classes (beverages, fruits and personal care) are predicted very well, while others (meat, snacks) perform less well.  An analysis of why is beyond the scope of this exercise.
 
-```{r}
-print(rf)
-```
 
 
 #### C. Making Predicions
 
-```{r}
-predictions <- predict(rf, dfEval)
-x <- factor(dfEval$Item.Type)
-confusionMatrix(predictions, x)
 
-dfPred <- as.data.frame(predictions)
-ggplot(dfPred, aes(predictions)) +
-  geom_bar() +
-  coord_flip()
-```
 
 #### D. Analyzing the Larger Dataset
 
 Now we examine the larger dataset and make some comparisons. Since the 5000 database is a subset of this one, we would expect many similarities. Not surprisingly, multicollinearity and distributions look the same. Unit Costs and Item Types continue to match one to one. The standard deviation of Total.Profit is slightly smaller, as is the mean.  We are not adding a lot of significant information with this data set. However, the n may improve our confidence intervals.
 
 In fact, our accuracy improves from 87 to 98%.All classes show 97% accuracy or higher.  This demonstrates the benefits of increasing n.
-
-```{r}
-
-dfLarge <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_50000.csv")
-
-summary(dfLarge)
-```
-```{r}
-
-sd(df2$Total.Profit)
-sd(dfLarge$Total.Profit)
-
-mean(df2$Total.Profit)
-mean(dfLarge$Total.Profit)
-
-dfLargeNum <- dfLarge %>%
-  dplyr::select_if(is.numeric)
-
-z <- EHExplore_Multicollinearity(dfLargeNum, title="Multicollinearity Among Economic Variables")
-a <- EHSummarize_SingleColumn_Histograms(dfLarge)
-grid.arrange(grobs=a[c(1:7)])
-
-ggplot(df2, aes(Item.Type, Unit.Cost)) +
-  geom_boxplot() +
-  coord_flip()
-
-```
-```{r}
-df2 <-dfLarge
-
-df2$Item.Type <- factor(df2$Item.Type)
-df2$Region <- factor(df2$Region)
-
-df2$Order.Date <- as.Date(df2$Order.Date, format="%m/%d/%Y")
-df2$Ship.Date <- as.Date(df2$Ship.Date, format="%m/%d/%Y")
-
-df2$Order.Lag <- as.integer(df2$Ship.Date-df2$Order.Date)
-df2$OrderDaysSince2000 <- as.integer(df2$Ship.Date-as.Date("2000-01-01"))
-
-df3 <- df2 %>%
-    dplyr::select(-Order.Date, -Ship.Date, -Country, -Unit.Price, -Total.Revenue, -Total.Cost, -Units.Sold)
-
-
-z=list("Item.Type")
-
-df3a <- df3 %>%
-  dplyr::select(-Unit.Cost)
-
-df3a$Units.Sold <- scale(df2$Units.Sold)
-
-df3b <- EHPrepare_CreateDummies(df3a, exclude=z, dropFirst=TRUE)
-df4 <- EHPrepare_ScaleAllButTarget(df3b, "Item.Type")
-
-set.seed(042760)
-i <- createDataPartition(df4$Item.Type, p=0.80, list=FALSE)
-dfEval <- df4[-i,]
-dfTrain <- df4[i,]
-
-dfTrain %>% count(Item.Type)
-
-tc <- trainControl(method="cv", number=10)
-metric <- "Accuracy"
-
-set.seed(042760)
-multinom <- train(Item.Type~., data=dfTrain, method="multinom", metric=metric, trControl=tc)
-rf <- train(Item.Type~., data=dfTrain, method="rf", metric=metric, trControl=tc)
-
-```
-
-```{r}
-
-results <- resamples(list(Multinomial=multinom, RandomForest=rf))
-summary(results)
-dotplot(results)
-
-```
-```{r}
-
-
-predictions <- predict(rf, dfEval)
-x <- factor(dfEval$Item.Type)
-confusionMatrix(predictions, x)
-
-dfPred <- as.data.frame(predictions)
-ggplot(dfPred, aes(predictions)) +
-  geom_bar() +
-  coord_flip()
-```
-
