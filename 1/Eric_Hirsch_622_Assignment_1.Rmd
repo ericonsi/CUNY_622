@@ -36,9 +36,10 @@ library(class)
 ```{r}
 
 df2 <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_5000.csv")
-#df2 <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_50000.csv")
 
 ```
+
+Summary - We analyze sales data records and, after carefully exploring and wrangling the data, choose to predict Item Type using the Multinomial Regression and Random Forest machine learning methods.  Both methods perform well on a smaller dataset, with the Random Forest algorithm giving us 87% accuracy.The smaller dataset matches the larger one closely in terms of standard deviations, means and distributions. However, RF benefits from the higher n and gives us 98% accuracy in our predictions.
 
 ### 1. Data Exploration
 
@@ -227,7 +228,13 @@ dfTrain %>% count(Item.Type)
 
 #### B. Selecting Models
 
-A number of factors weigh in to our decision of which models to choose.  We know that we have multiple classes to predict, that total profit, a key predictor, is not normally distributed, and that, given the strong match between item type and unit cost on the one hand and total profits and unit costs on the other, classes are likely to be somewhat separate.  Random Forest and multinomial regression will likely perform well under these conditions, so this is what we choose.
+A number of factors weigh in to our decision of which models to choose.  We know that we have multiple classes to predict, that total profit, a key predictor, is not normally distributed, and that, given the strong match between item type and unit cost on the one hand and total profits and unit costs on the other, classes are likely to be relatively separate. Many of our predictors are categorical so we don't expect strong linear relationships.  The number of categories is small compared to the number of records, so our data is not sparse.  
+
+
+Random Forest (RF) and multinomial regression (MR) will likely perform well under these conditions, so this is what we choose. MR has the advantages that it may be more interpretable and, because we get probabilities instead of firm classes, it is more flexible.  
+
+We have chosen one parametric (MR) and one non-parametric method (RF). The parametric method will likely be simpler, faster and require less data.  However, it may not create as good a fit with the data.  The nonparametric method (RF) requires more data and will be slower, but will likely create a better fit.  This will lead to more accuracy, (unless the paradigm overfits the data which is more of a concern here than with MR.)
+
 
 We will use 10-fold cross validation.
 
