@@ -368,3 +368,6 @@ ggplot(dfPred, aes(predictions)) +
   coord_flip()
 ```
 
+#### E. Conclusion
+
+Item types were predicted from other aspects of country sales records, such as total profits, region, unit sales, priority, etc. Because each item type is associated with exactly one unit price, there is going to be 
