@@ -254,14 +254,18 @@ results <- resamples(list(Multinomial=multinom, RandomForest=rf))
 summary(results)
 dotplot(results)
 ```
-Random Forest performs quite well.  Mean accuracy is 88% at mtry = 14.  Now we test our random forest model on the evaluation set.  We see that certain classes (beverages, fruits and personal care) are predicted very well, while others (meat, snacks) perform less well.  An analysis of why is beyond the scope of this exercise.
+Random Forest performs quite well.  Mean accuracy is 88% at mtry = 14.  
+
+#### C. Making Predicions
+
+Now we test our random forest model on the evaluation set.  We see that certain classes (beverages, fruits and personal care) are predicted very well, while others (meat, snacks) perform less well.  An analysis of why is beyond the scope of this exercise.
+
+Analysis of important predictors
 
 ```{r}
 print(rf)
+
 ```
-
-
-#### C. Making Predicions
 
 ```{r}
 predictions <- predict(rf, dfEval)
@@ -273,6 +277,26 @@ ggplot(dfPred, aes(predictions)) +
   geom_bar() +
   coord_flip()
 ```
+
+Which factors are most important? 
+
+```{r}
+varImp(rf)
+
+
+dt <- train(Item.Type~., data=dfTrain, method="rpart", metric=metric, trControl=tc)
+library(rpart.plot)
+rpart.plot(dt$finalModel)
+
+dfTrain2 <- dfTrain %>%
+  dplyr::select(-Total.Profit)
+
+dt <- train(Item.Type~., data=dfTrain2, method="rpart", metric=metric, trControl=tc)
+
+library(rpart.plot)
+rpart.plot(dt$finalModel)
+```
+
 
 #### D. Analyzing the Larger Dataset
 
