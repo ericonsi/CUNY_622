@@ -39,7 +39,38 @@ df2 <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_5000.csv")
 
 ```
 
-Summary - We analyze sales data records and, after carefully exploring and wrangling the data, choose to predict Item Type using the Multinomial Regression and Random Forest machine learning methods.  Both methods perform well on a smaller dataset, with the Random Forest algorithm giving us 87% accuracy.The smaller dataset matches the larger one closely in terms of standard deviations, means and distributions. However, RF benefits from the higher n and gives us 98% accuracy in our predictions.
+### Summary 
+
+In this analysis, we review two sets of VBA-generated sales data records, one large (5,000) and one small (100).  The data includes categorical and numerical data - the numerical data are largely collinear with each other, as they represent all the components of profit - unit sales, unit price, total revenue, total cost and so on. Categorical predictors include Region, Country, Item Type, Sales channel, and Order Priority.  There are, additionally, order and shipping dates. There are no missing values.
+
+Because this is not "real" data, there are some unusual characteristics to the data shape. Perhaps the most unusual feature of the data is a one-to-one match between unit cost and item type.  There are some other unusual findings as well -, for example, we might expect the distribution of the lag time between order and shipment to be skewed right (most lags would be small and very large lags would rare), but instead it is uniform. This means we will need to rely heavily on the data and not make inferences based on common sense or business knowledge.
+
+In order to address the multicollinearity in the dataset, we remove a number of predictors - we eliminate country and retain region, we eliminate shipping date but create a new variable for lag between order and shipping, and we eliminate most numerical variables except total profit and one other variable (because the same profit may be generated from high volume or low volume.)  We initially retain unit cost for this purpose, because this has the lowest correlation with profit (r=.50).  However, this was before we discovered the relationship between unit cost and item type.  After that, we used units sold instead, which has little relationship to unit cost (r=-.02) and moderate (relative to the other variables) correlation with total profit (.58).
+
+Having wrangled the dataset, we explored opportunities to use machine learning to make predictions about the data.  There are a number of labeled classes that would work here. Analysis suggested that item type would lend itself well to prediction, which makes sense since unit price is correlated with total profit and is a perfect match with item type. Instead, we chose first to examine region, which appeared to be more challenging and interesting exercise. In practice, however, region showed little correlation with the other variables and prediction (not included below) did not perform better than random.
+
+We therefore imagined a business use case for predicting item type (an intern had inadvertently eliminated item cost and item type from a dataset of sales records and we needed to reconstruct them) and considered machine learning algorithms to correct the problem.
+
+A number of factors weighed in on our decision of which models to choose.  We know that:
+
+* we have multiple classes to predict
+* the classes are relatively balanced
+* total profit, a key predictor, is not normally distributed (but could be transformed if need be)
+* many of our predictors are categorical, but they may be overshadowed by total profit
+* we likely have enough records in both datasets to avoid the "curse of dimensionality"
+* we have the patience and computer power for more complex algorithms, as 50,000 records is not unreasonably large
+
+Given the conditions, we choose one parametric (Multinomial Regression) and one non-parametric method (Random Forest) in order to compare them. Both algorithms generally perform well under the circumstances above.  Because the parametric method relies on statistical assumptions, it will be as good as those assumptions are accurate.  Our analysis shows that the relationship between total profit and item type, insofar as total profit relies on item cost, is linear with a log transformation, so we take a log transformation of total profit.   
+
+Our parametric method (Multinomial Regression) is likely be simpler, faster and require less data than out nonparametric one.  However, it may not create as good a fit with the data.  Our nonparametric method (Random Forest) requires more data and will be slower, but will likely create a better fit.  This may lead to more accuracy, or the method may overfit the data.  MR additionally has the advantages that it may be more interpretable and, because we get probabilities instead of firm classes, it may be more flexible in terms of how we apply it.  
+
+We used 10-fold cross validation and applied both methods to the training data. Both perform well, but random forest significantly outperforms multinomial regression, with a mean 48% and 88% accuracy respectively.  A log transformation of total profit improves the multinomial regression to a mean of 53%.  RF does a good job predicting categories, achieving the 87% accuracy of the training set.  
+
+An analysis of influential factors and a look at an example of one tree, however, shows a problem with the exercise.  Total profit is almost exclusively the only factor random forest uses in the determining item type, suggesting that the exercise is somewhat trivial. This was the risk we took when we retained total profit despite knowing about the relationship between profit, unit cost and item type. To create a more interesting analysis, it might have been better to leave profit out - a quick examination of one tree without total profit shows the influence of order lag, units sold, region and order date.
+
+Now we examine the larger dataset (50,000 records) and make some comparisons. Since the 5000 database is a subset of this one, we would expect many similarities. Not surprisingly, multicollinearity and distributions look the same. Unit Costs and Item Types continue to match one to one. The standard deviation of total profit is slightly smaller, as is the mean.  We are not adding a lot of significant information with this data set. There is also some concern that as a VBA generated dataset, the records in the dataset may not show enough variation.
+
+It is interesting to note, however, that  However, RF benefits from the higher n and gives us 98% accuracy in our predictions.  All classes show 97% accuracy or higher.  This demonstrates the benefits of increasing n.  
 
 ### 1. Data Exploration
 
@@ -117,14 +148,14 @@ grid.arrange(grobs=a[2])
 
 #### D. Relationships
 
-We can run a regression on total profit just to get an idea of some of the relationships between the numeric and categorical variables.  We can see from this exploration that item types are strongly correlated with profits, as are medium priority items, but nothing else is. Unit cost could not be calculated because of singularities. We know Unit Cost is not fully correlated with Total Profit, so it must be fully correlated with another variable or in conjunction with other variables.
+We can run a regression on total profit just to get an idea of some of the relationships between the numeric and categorical variables.  We can see from this exploration that item types are strongly correlated with profits, as are medium priority items, but nothing else is. Unit cost could not be calculated because of singularities. We know unit cost is not fully correlated with total profit, so it must be fully correlated with another variable or in conjunction with other variables.
 
 ```{r}
 
 x <- lm(Total.Profit ~., data=df3)
 summary(x)
 ```
-This analysis suggests that Item Type may be the most reasonable class to predict.  However, region may also work, if it is correlated with some of the other variables besides profit.  We can test this conjecture with some further analysis. 
+This analysis suggests that item type may be the most reasonable class to predict.  However, region may also work, if it is correlated with some of the other variables besides profit.  We can test this conjecture with some further analysis. 
 
 Bar charts and boxplots show relatively little relationship between region and item type, sales channel, and order priority.
 
@@ -147,9 +178,10 @@ ggplot(df2, aes(Region, Unit.Cost)) +
   coord_flip()
 
 ```
-####. D. Choosing Item Type as the variable to predict
 
-We therefore choose Item Type to predict for this analysis.  As with region, we can ask, "how does it correlate with the non-economic variables?"  In general, Item Type shows a similar lack of relationship to the non-economic variables as region does. But there is one major exception.  Now we see the source of the singularity - each item type has one, and only one, unit price and vice versa.  The two are completely correlated.  Just to be sure, a regression shows an R2 of 1.
+####. D. Choosing item type as the variable to predict
+
+We therefore choose Item Type to predict for this analysis.  As with region, we can ask, "how does it correlate with the non-economic variables?"  Item type shows some relationship with order lag and order date.  However, the most striking relationship is with unit cost.  Now we see the source of the singularity - each item type has one, and only one, unit cost and vice versa.  The two are completely correlated.  When we take the log of unit cost, we see a relatively linear relationship.  Just to be sure, a regression shows an R2 of 1.
 
 ```{r}
 
@@ -160,15 +192,32 @@ grid.arrange(grobs=a[c(3:4)])
 
 ```{r}
 
-ggplot(df2, aes(Item.Type, Order.Lag)) +
+df2a <- df2
+
+ggplot(df2a, aes(Item.Type, Order.Lag)) +
   geom_boxplot() +
   coord_flip()
-ggplot(df2, aes(Item.Type, OrderDaysSince2000)) +
+ggplot(df2a, aes(Item.Type, OrderDaysSince2000)) +
   geom_boxplot() +
   coord_flip()
-ggplot(df2, aes(Item.Type, Unit.Cost)) +
+
+df2a$Item.Type <- as.factor(df2a$Item.Type)
+ggplot(df2a, aes(Unit.Cost, fct_reorder(Item.Type,
+                         Unit.Cost))) +
   geom_boxplot() +
-  coord_flip()
+  ggtitle("Item Type and Unit Cost") +
+    ylab("Item Type")
+
+
+df2a$Unit.Cost = log(df2a$Unit.Cost)
+df2a$Item.Type <- as.factor(df2a$Item.Type)
+
+ggplot(df2a, aes(Unit.Cost, fct_reorder(Item.Type,
+                         Unit.Cost))) +
+  geom_boxplot() +
+  ylab("Item Type") +
+  xlab("Log(Unit Cost)") +
+  ggtitle("Item Type and Log of Unit Cost")
 
 ```
 
@@ -182,7 +231,7 @@ summary(x)
 
 ```
 
-With Unit Cost in the analysis, a machine learning exploration is not justified, since a lookup table in Excel would perform just as well. We will retain total profit, and add Units.Sold, which has little correlation with Unit.Cost.  We remove Unit.Cost, add Units.Sold, dummify the categorical variables and scale all the predictors.
+With unit cost in the analysis, a machine learning exploration is not justified, since a lookup table in Excel would perform just as well. We will retain total profit, and add Units.Sold, which has little correlation with Unit.Cost.  We remove Unit.Cost, add Units.Sold, dummify the categorical variables and scale all the predictors.
 
 ```{r}
 
@@ -196,15 +245,7 @@ df3a$Units.Sold <- scale(df2$Units.Sold)
 df3b <- EHPrepare_CreateDummies(df3a, exclude=z, dropFirst=TRUE)
 df4 <- EHPrepare_ScaleAllButTarget(df3b, "Item.Type")
 
-
-df4q <- df4 %>%
- slice(which(row_number() %% 100 == 1)) %>%
-  mutate(Item.Type = ifelse(Item.Type=="Snacks"|Item.Type=="Meat"|Item.Type=="Baby Food", "Snacks", "Other"))
-
-df5q <- df4q %>%
-  dplyr::select(Total.Profit, Units.Sold, Item.Type)
-
-write_tsv(df5q, "xqjgjk.tsv")
+df4$Total.Profit = log(df4$Total.Profit+10)
 
 ```
 
@@ -215,6 +256,7 @@ write_tsv(df5q, "xqjgjk.tsv")
 #### A. Preparing the data
 
 The data needs to be partitioned into a training set and an evaluation set. We examine our classes in the training set and see that they are relatively uniform.
+
 ```{r}
 set.seed(042760)
 i <- createDataPartition(df4$Item.Type, p=0.80, list=FALSE)
@@ -238,7 +280,7 @@ We have chosen one parametric (MR) and one non-parametric method (RF). The param
 
 We will use 10-fold cross validation.
 
-```{r, messages=FALSE}
+```{r, messages=FALSE, echo=FALSE}
 
 tc <- trainControl(method="cv", number=10)
 metric <- "Accuracy"
@@ -249,7 +291,7 @@ rf <- train(Item.Type~., data=dfTrain, method="rf", metric=metric, trControl=tc)
 ```
 
 ```{r}
-
+summary(multinom)
 results <- resamples(list(Multinomial=multinom, RandomForest=rf))
 summary(results)
 dotplot(results)
@@ -259,8 +301,6 @@ Random Forest performs quite well.  Mean accuracy is 88% at mtry = 14.
 #### C. Making Predicions
 
 Now we test our random forest model on the evaluation set.  We see that certain classes (beverages, fruits and personal care) are predicted very well, while others (meat, snacks) perform less well.  An analysis of why is beyond the scope of this exercise.
-
-Analysis of important predictors
 
 ```{r}
 print(rf)
@@ -298,31 +338,31 @@ rpart.plot(dt$finalModel)
 ```
 
 
-#### D. Analyzing the Larger Dataset
+#### D. Analyzing the Smaller Dataset
 
-Now we examine the larger dataset and make some comparisons. Since the 5000 database is a subset of this one, we would expect many similarities. Not surprisingly, multicollinearity and distributions look the same. Unit Costs and Item Types continue to match one to one. The standard deviation of Total.Profit is slightly smaller, as is the mean.  We are not adding a lot of significant information with this data set. However, the n may improve our confidence intervals.
+Now we examine the smaller dataset and make some comparisons. Since the 5000 database is a superset of this one, we would expect similarities. Not surprisingly, multicollinearity and distributions look the same. Unit Costs and Item Types continue to match one to one. The standard deviation of Total.Profit is slightly smaller, as is the mean.  We are not adding a lot of significant information with this data set. 
 
 In fact, our accuracy improves from 87 to 98%.  All classes show 97% accuracy or higher.  This demonstrates the benefits of increasing n.
 
 ```{r}
 
-dfLarge <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_50000.csv")
+dfSmall <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_100.csv")
 
-summary(dfLarge)
+summary(dfSmall)
 ```
 ```{r}
 
 sd(df2$Total.Profit)
-sd(dfLarge$Total.Profit)
+sd(dfSmall$Total.Profit)
 
 mean(df2$Total.Profit)
-mean(dfLarge$Total.Profit)
+mean(dfSmall$Total.Profit)
 
-dfLargeNum <- dfLarge %>%
+dfSmallNum <- dfSmall %>%
   dplyr::select_if(is.numeric)
 
-z <- EHExplore_Multicollinearity(dfLargeNum, title="Multicollinearity Among Economic Variables")
-a <- EHSummarize_SingleColumn_Histograms(dfLarge)
+z <- EHExplore_Multicollinearity(dfSmallNum, title="Multicollinearity Among Economic Variables")
+a <- EHSummarize_SingleColumn_Histograms(dfSmall)
 grid.arrange(grobs=a[c(1:7)])
 
 ggplot(df2, aes(Item.Type, Unit.Cost)) +
@@ -331,7 +371,7 @@ ggplot(df2, aes(Item.Type, Unit.Cost)) +
 
 ```
 ```{r}
-df2 <-dfLarge
+df2 <-dfSmall
 
 df2$Item.Type <- factor(df2$Item.Type)
 df2$Region <- factor(df2$Region)
@@ -355,6 +395,8 @@ df3a$Units.Sold <- scale(df2$Units.Sold)
 
 df3b <- EHPrepare_CreateDummies(df3a, exclude=z, dropFirst=TRUE)
 df4 <- EHPrepare_ScaleAllButTarget(df3b, "Item.Type")
+
+df4$Total.Profit = log(df4$Total.Profit+10)
 
 set.seed(042760)
 i <- createDataPartition(df4$Item.Type, p=0.80, list=FALSE)
@@ -384,7 +426,7 @@ dotplot(results)
 
 predictions <- predict(rf, dfEval)
 x <- factor(dfEval$Item.Type)
-confusionMatrix(predictions, x)
+#confusionMatrix(predictions, x)
 
 dfPred <- as.data.frame(predictions)
 ggplot(dfPred, aes(predictions)) +
