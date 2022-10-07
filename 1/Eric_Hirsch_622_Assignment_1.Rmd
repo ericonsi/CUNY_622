@@ -39,42 +39,47 @@ df2 <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_5000.csv")
 
 ```
 
-### Summary 
+### Predicting item type in sales data records 
 
-In this analysis, we review two sets of VBA-generated sales data records, one large (5,000) and one small (100).  The data includes categorical and numerical data - the numerical data are largely collinear with each other, as they represent all the components of profit - unit sales, unit price, total revenue, total cost and so on. Categorical predictors include Region, Country, Item Type, Sales channel, and Order Priority.  There are, additionally, order and shipping dates. There are no missing values.
+In this analysis, we review two sets of VBA-generated sales data records, one large (5,000) and one small (100).  The data includes categorical and numerical data - the numerical data are largely collinear with each other as they represent all the components of profit - unit sales, unit price, total revenue, total cost and so on. Categorical predictors include Region, Country, Item Type, Sales channel, and Order Priority.  There are, additionally, order and shipping dates. There are no missing values.
 
 Because this is not "real" data, there are some unusual characteristics to the data shape. Perhaps the most unusual feature of the data is a one-to-one match between unit cost and item type.  There are some other unusual findings as well - for example, we might expect the distribution of the lag time between order and shipment to be skewed right (most lags would be small and very large lags would rare), but instead it is uniform. Order ID, normally a throwaway variable, is moderately negatively correlated with revenue. This means we will need to rely heavily on the data and not make too many inferences based on common sense or business knowledge.
 
-In order to address the multicollinearity in the dataset, we remove a number of predictors - we eliminate country and retain region, we eliminate shipping date but create a new variable for lag between order and shipping, and we eliminate most numerical variables except total profit and one other variable (because the same profit may be generated from high volume or low volume.)  We initially retain unit cost for this purpose, because this has the lowest correlation with profit (r=.50).  However, this was before we discovered the relationship between unit cost and item type.  After that, we used units sold instead, which has little relationship to unit cost (r=-.02) and moderate (relative to the other variables) correlation with total profit (.58). We also remove order ID, despite its predicive power in this dataset, to make our analysis more meaningful. 
+In order to address the multicollinearity in the dataset, we remove a number of predictors - we eliminate country and retain region, we eliminate shipping date but create a new variable for lag between order and shipping, and we eliminate most numerical variables except total profit and one other variable (because the same profit may be generated from high volume or low volume.)  We retain units sold, because it has little relationship to unit cost (r=-.02) and moderate (relative to the other variables!) correlation with total profit (.58). We also remove order ID, despite its predictive power in this dataset, to make our analysis more meaningful. 
 
-Having wrangled the dataset, we explored opportunities to use machine learning to make predictions about the data.  There are a number of labeled classes that would work here. Analysis suggested that item type would lend itself well to prediction, which makes sense since unit price is correlated with total profit and is a perfect match with item type. Instead, we chose first to examine region, which appeared to be more challenging and interesting exercise. In practice, however, region showed little correlation with the other variables and prediction (not included below) did not perform better than random.
+Having wrangled the dataset, we explore opportunities to use machine learning to make predictions about the data.  There are a number of labeled classes that would work here. Analysis suggests that item type would lend itself well to prediction, which makes sense since unit price is correlated with total profit and is a perfect match with item type. However, we choose first to examine region, which appears to be a more challenging and interesting exercise. It turns out that in practice, region shows little correlation with the other variables and prediction (not included below) does not perform better than random.
 
-We therefore imagined a business use case for predicting item type (an intern had inadvertently eliminated item cost and item type from a dataset of sales records and we needed to reconstruct them) and considered machine learning algorithms to correct the problem.
+We choose, therefore, to predict item type.  Machine learning practices do not exist in isolation from business use cases, so we construct one in order to guide our analysis. We imagine an intern has inadvertently eliminated item cost and item type from a dataset of sales records and we need to reconstruct them for a presentation to our parent company that afternoon.  We have only this morning to reconstruct the data (which limits the amount of data we can process), but because it is only a general presentation we don't need to be fully accurate (80% accuracy will do).  For the purpose of the presentation we don't need to be able to make inferences about item type, but we should know enough about how the predictions are being made in order to be comfortable that the process was done properly.
 
-A number of factors weighed in on our decision of which models to choose.  We know that:
+We now consider machine learning algorithms to correct the problem.
+
+A number of factors weigh in on our decision of which models to choose.  We know that:
 
 * we have multiple classes to predict
 * the classes are relatively balanced
 * total profit, a key predictor, is not normally distributed (but could be transformed if need be)
 * many of our predictors are categorical, but they may be overshadowed by total profit
-* we likely have enough records in both datasets to avoid the "curse of dimensionality"
-* we have the patience and computer power for more complex algorithms, as 50,000 records is not unreasonably large
+* we likely have enough records in the larger dataset to avoid the "curse of dimensionality" but possibly not the smaller
+* the larger dataset is probably near, but not at, the limit of what our resources can comfortably handle - if our predictions are inadequate we can increase the size of the dataset.
 
-Given the conditions, we choose one parametric (Multinomial Regression) and one non-parametric method (Random Forest) in order to compare them. Both algorithms generally perform well under the circumstances above.  Because the parametric method relies on statistical assumptions, it will be as good as those assumptions are accurate.  Our analysis shows that the relationship between total profit and item type, insofar as total profit relies on item cost, is linear with a log transformation, so we take a log transformation of total profit.   
+Given these conditions, we choose one parametric (Multinomial Regression) and one non-parametric method (Random Forest) in order to compare them. Both algorithms generally perform well under the circumstances above.  Because the parametric method relies on statistical assumptions, it will be as good as those assumptions are accurate.  Our analysis shows that the relationship between total profit and item type, insofar as total profit relies on item cost, is linear with a log transformation, so we take a log transformation of total profit for this analysis.   
 
-Our parametric method (Multinomial Regression) is likely be simpler, faster and require less data than out nonparametric one.  However, it may not create as good a fit with the data.  Our nonparametric method (Random Forest) requires more data and will be slower, but will likely create a better fit.  This may lead to more accuracy, or the method may overfit the data.  MR additionally has the advantages that it may be more interpretable and, because we get probabilities instead of firm classes, it may be more flexible in terms of how we apply it.  
+Our parametric method (Multinomial Regression) is likely be simpler, faster and require less data than our nonparametric one.  However, it may not create as good a fit with the data.  Our nonparametric method (Random Forest) requires more data and will be slower, but will likely create a better fit.  This may lead to more accuracy, or conversely the method may overfit the data.  MR additionally has the advantages that it may be more interpretable and, because we get probabilities instead of firm classes, it may be more flexible in terms of how we apply it.  
 
-We used 10-fold cross validation and applied both methods to the training data. Both perform well, but random forest significantly outperforms multinomial regression, with a mean 48% and 88% accuracy respectively.  A log transformation of total profit improves the multinomial regression to a mean of 53%.  RF does a good job predicting categories, achieving the 87% accuracy of the training set.  
+We use 10-fold cross validation and apply both methods to the training data. Without doing any custom tuning, both perform well, but random forest significantly outperforms multinomial regression, with a mean 88% vs 48% accuracy respectively on the training set.  A log transformation of total profit improves the multinomial regression to a mean of 53%. We then use RF to predict our classes and we achieve 87% accuracy, which exceeds our business case benchmark.
 
-An analysis of influential factors and a look at an example of one tree, however, shows a problem with the exercise.  Total profit is almost exclusively the only factor random forest uses in the determining item type, suggesting that the exercise is somewhat trivial. This was the risk we took when we retained total profit despite knowing about the relationship between profit, unit cost and item type. To create a more interesting analysis, it might have been better to leave profit out - a quick examination of one tree without total profit shows the influence of order lag, units sold, region and order date.
+An analysis of influential factors and a look at an example of one tree, however, shows something important about our exercise.  Total profit is almost exclusively the only factor random forest uses in determining item type, suggesting that the exercise is perhaps somewhat trivial. This was the risk we took when we retained total profit despite knowing about the relationship between profit, unit cost and item type. To create a more interesting analysis, it might have been better to leave profit out - a quick examination of one tree without total profit shows the influence of order lag, units sold, region and order date, a finding that is corroborated by earlier analysis that showed the correlation between item type and these predictors.
 
-Following this exercise, we examined the smaller dataset and made some comparisons with the larger. Since the 5,000 database is a superset of this one, we would expect similarities. 
+Following this exercise, we examine the smaller dataset and make some comparisons with the larger. Since the 5,000 database is generated by the same VBA algorithm s this one, we would expect similarities. 
 
-Multicollinearity and distributions look the similar. unit costs and item types continue to match one to one. The standard deviation of total profit is higher, as is the mean.  Not surprisingly, this dataset looks like a sample of the larger one, with similar characteristics except that sample means and standard deviations are further from the population compared to the larger one.  
+Multicollinearity and distributions look similar. Unit costs and item types continue to match one-to-one. The standard deviation of total profit is higher, as is the mean.  Not surprisingly, this dataset behaves just as if it were a sample of the larger one, with similar characteristics except that sample means and standard deviations are further from the population compared to the larger one.  
 
-A distribution of classes also shows how sparse the data has become.  Some classes have 3 or less members and some are missing altogether. These "curse of dimensionalitity" issues are likely to hurt the analysis.
+A distribution of classes shows how sparse the data has become.  Some classes have 3 or less members and some are missing altogether. These "curse of dimensionalitity" issues are likely to hurt the analysis.
 
-With less data to train on and more variation in the dataset, We expect a loss of predictive power with the drop in n. In fact, our accuracy on the training set degrades to .37% (was 87%) and .28% (was 53%) for RF and MR respectively.  Because the data is so sparse, the classes in the training set don't match those in the evaluation set so we can't do predictions. 
+With less data to train on and more variation in the dataset, we expect a loss of predictive power. In fact, our accuracy on the training set degrades to .37% (was 87%) and .28% (was 53%) for RF and MR respectively.  Because the data is so sparse, the classes in the training set don't match those in the evaluation set so we can't do predictions. 
+
+In the business use case we would be satisfied with our results on the 5,000 record database, understanding that in the vast majority of cases, item type is going to be determined almost entirely by the profit margin. We use our algorthm to predict the missing records and send it off to our data visualization department for the presentation.
+
 
 ### 1. Data Exploration
 
@@ -183,7 +188,8 @@ ggplot(df2, aes(Region, Unit.Cost)) +
 
 ```
 
-####. D. Choosing item type as the variable to predict
+
+####. E. Choosing item type as the variable to predict
 
 We therefore choose Item Type to predict for this analysis.  As with region, we can ask, "how does it correlate with the non-economic variables?"  Item type shows some relationship with order lag and order date.  However, the most striking relationship is with unit cost.  Now we see the source of the singularity - each item type has one, and only one, unit cost and vice versa.  The two are completely correlated.  When we take the log of unit cost, we see a relatively linear relationship.  Just to be sure, a regression shows an R2 of 1.
 
@@ -450,4 +456,4 @@ ggplot(dfPred, aes(predictions)) +
 
 #### E. Conclusion
 
-Item types were predicted from other aspects of country sales records, such as total profits, region, unit sales, priority, etc. Random forest outperfomred multinomial regression for both datasets.  The smaller dataset suffered from low n and sparseness - with a corresponding drop in accuracy.
+Item types were predicted from other aspects of country sales records, such as total profits, region, unit sales, priority, etc. Random forest outperformed multinomial regression for both datasets.  The smaller dataset suffered from low n and sparseness - with a corresponding drop in accuracy.
