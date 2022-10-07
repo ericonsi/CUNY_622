@@ -43,9 +43,9 @@ df2 <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_5000.csv")
 
 In this analysis, we review two sets of VBA-generated sales data records, one large (5,000) and one small (100).  The data includes categorical and numerical data - the numerical data are largely collinear with each other, as they represent all the components of profit - unit sales, unit price, total revenue, total cost and so on. Categorical predictors include Region, Country, Item Type, Sales channel, and Order Priority.  There are, additionally, order and shipping dates. There are no missing values.
 
-Because this is not "real" data, there are some unusual characteristics to the data shape. Perhaps the most unusual feature of the data is a one-to-one match between unit cost and item type.  There are some other unusual findings as well -, for example, we might expect the distribution of the lag time between order and shipment to be skewed right (most lags would be small and very large lags would rare), but instead it is uniform. This means we will need to rely heavily on the data and not make inferences based on common sense or business knowledge.
+Because this is not "real" data, there are some unusual characteristics to the data shape. Perhaps the most unusual feature of the data is a one-to-one match between unit cost and item type.  There are some other unusual findings as well - for example, we might expect the distribution of the lag time between order and shipment to be skewed right (most lags would be small and very large lags would rare), but instead it is uniform. Order ID, normally a throwaway variable, is moderately negatively correlated with revenue. This means we will need to rely heavily on the data and not make too many inferences based on common sense or business knowledge.
 
-In order to address the multicollinearity in the dataset, we remove a number of predictors - we eliminate country and retain region, we eliminate shipping date but create a new variable for lag between order and shipping, and we eliminate most numerical variables except total profit and one other variable (because the same profit may be generated from high volume or low volume.)  We initially retain unit cost for this purpose, because this has the lowest correlation with profit (r=.50).  However, this was before we discovered the relationship between unit cost and item type.  After that, we used units sold instead, which has little relationship to unit cost (r=-.02) and moderate (relative to the other variables) correlation with total profit (.58).
+In order to address the multicollinearity in the dataset, we remove a number of predictors - we eliminate country and retain region, we eliminate shipping date but create a new variable for lag between order and shipping, and we eliminate most numerical variables except total profit and one other variable (because the same profit may be generated from high volume or low volume.)  We initially retain unit cost for this purpose, because this has the lowest correlation with profit (r=.50).  However, this was before we discovered the relationship between unit cost and item type.  After that, we used units sold instead, which has little relationship to unit cost (r=-.02) and moderate (relative to the other variables) correlation with total profit (.58). We also remove order ID, despite its predicive power in this dataset, to make our analysis more meaningful. 
 
 Having wrangled the dataset, we explored opportunities to use machine learning to make predictions about the data.  There are a number of labeled classes that would work here. Analysis suggested that item type would lend itself well to prediction, which makes sense since unit price is correlated with total profit and is a perfect match with item type. Instead, we chose first to examine region, which appeared to be more challenging and interesting exercise. In practice, however, region showed little correlation with the other variables and prediction (not included below) did not perform better than random.
 
@@ -68,16 +68,20 @@ We used 10-fold cross validation and applied both methods to the training data. 
 
 An analysis of influential factors and a look at an example of one tree, however, shows a problem with the exercise.  Total profit is almost exclusively the only factor random forest uses in the determining item type, suggesting that the exercise is somewhat trivial. This was the risk we took when we retained total profit despite knowing about the relationship between profit, unit cost and item type. To create a more interesting analysis, it might have been better to leave profit out - a quick examination of one tree without total profit shows the influence of order lag, units sold, region and order date.
 
-Now we examine the larger dataset (50,000 records) and make some comparisons. Since the 5000 database is a subset of this one, we would expect many similarities. Not surprisingly, multicollinearity and distributions look the same. Unit Costs and Item Types continue to match one to one. The standard deviation of total profit is slightly smaller, as is the mean.  We are not adding a lot of significant information with this data set. There is also some concern that as a VBA generated dataset, the records in the dataset may not show enough variation.
+Following this exercise, we examined the smaller dataset and made some comparisons with the larger. Since the 5,000 database is a superset of this one, we would expect similarities. 
 
-It is interesting to note, however, that  However, RF benefits from the higher n and gives us 98% accuracy in our predictions.  All classes show 97% accuracy or higher.  This demonstrates the benefits of increasing n.  
+Multicollinearity and distributions look the similar. unit costs and item types continue to match one to one. The standard deviation of total profit is higher, as is the mean.  Not surprisingly, this dataset looks like a sample of the larger one, with similar characteristics except that sample means and standard deviations are further from the population compared to the larger one.  
+
+A distribution of classes also shows how sparse the data has become.  Some classes have 3 or less members and some are missing altogether. These "curse of dimensionalitity" issues are likely to hurt the analysis.
+
+With less data to train on and more variation in the dataset, We expect a loss of predictive power with the drop in n. In fact, our accuracy on the training set degrades to .37% (was 87%) and .28% (was 53%) for RF and MR respectively.  Because the data is so sparse, the classes in the training set don't match those in the evaluation set so we can't do predictions. 
 
 ### 1. Data Exploration
 
 
 #### A. Summary Statistics
 
-For this exercise we will examine the 5,000 record and 50,000 record datasets from the assignment website. 
+For this exercise we will examine the 5,000 record and 100 record datasets from the assignment website. 
 
 The datasets contain fabricated sales orders generated by VBA for the purpose of practicing analysis.  There are 14 columns, including 7 numeric columns, 5 character and two date. One of the predictors is an ID so we drop it. Here is a summary of the remaining 13 variables:
 
@@ -204,7 +208,7 @@ ggplot(df2a, aes(Item.Type, OrderDaysSince2000)) +
 df2a$Item.Type <- as.factor(df2a$Item.Type)
 ggplot(df2a, aes(Unit.Cost, fct_reorder(Item.Type,
                          Unit.Cost))) +
-  geom_boxplot() +
+  geom_point() +
   ggtitle("Item Type and Unit Cost") +
     ylab("Item Type")
 
@@ -214,7 +218,7 @@ df2a$Item.Type <- as.factor(df2a$Item.Type)
 
 ggplot(df2a, aes(Unit.Cost, fct_reorder(Item.Type,
                          Unit.Cost))) +
-  geom_boxplot() +
+  geom_point() +
   ylab("Item Type") +
   xlab("Log(Unit Cost)") +
   ggtitle("Item Type and Log of Unit Cost")
@@ -318,7 +322,7 @@ ggplot(dfPred, aes(predictions)) +
   coord_flip()
 ```
 
-Which factors are most important? 
+Which factors are most important? We can see that total profit is driving the analysis. Decision trees leaving total profit in and taking it out make this more clear.
 
 ```{r}
 varImp(rf)
@@ -340,13 +344,20 @@ rpart.plot(dt$finalModel)
 
 #### D. Analyzing the Smaller Dataset
 
-Now we examine the smaller dataset and make some comparisons. Since the 5000 database is a superset of this one, we would expect similarities. Not surprisingly, multicollinearity and distributions look the same. Unit Costs and Item Types continue to match one to one. The standard deviation of Total.Profit is slightly smaller, as is the mean.  We are not adding a lot of significant information with this data set. 
+Now we examine the smaller dataset and make some comparisons. Since the 5000 database is a superset of this one, we would expect similarities. 
 
-In fact, our accuracy improves from 87 to 98%.  All classes show 97% accuracy or higher.  This demonstrates the benefits of increasing n.
+Multicollinearity and distributions look the similar. Unit Costs and Item Types continue to match one to one. The standard deviation of Total.Profit is higher, as is the mean.  This dataset looks like a sample of the larger one, wth our sample means and standard deviations further from the population compared to the larger one.  
+
+A distribution of classes also shows how sparse the data has become.  Some classes have 3 or less members and some are missing altogether. These "curse of dimensionality" issues are going to hurt the analysis.
+
+With less data to train on and more variation in the dataset, We expect a loss of predictive power with the drop in n. In fact, our accuracy on the training set degrades to .37% (was 87%) and .28% (was 53%) for RF and MR respectively.  Because the data is so sparse, the classes in the training set don't match those in the evaluation set so we can't do predicitons.
 
 ```{r}
 
-dfSmall <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_100.csv")
+df2Small <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_100.csv")
+
+dfSmall <- df2Small %>%
+  dplyr::select(-Order.ID)
 
 summary(dfSmall)
 ```
@@ -363,11 +374,14 @@ dfSmallNum <- dfSmall %>%
 
 z <- EHExplore_Multicollinearity(dfSmallNum, title="Multicollinearity Among Economic Variables")
 a <- EHSummarize_SingleColumn_Histograms(dfSmall)
-grid.arrange(grobs=a[c(1:7)])
+grid.arrange(grobs=a[c(1:6)])
 
-ggplot(df2, aes(Item.Type, Unit.Cost)) +
-  geom_boxplot() +
-  coord_flip()
+dfSmall$Item.Type <- as.factor(dfSmall$Item.Type)
+ggplot(dfSmall, aes(Unit.Cost, fct_reorder(Item.Type,
+                         Unit.Cost))) +
+  geom_point() +
+  ggtitle("Item Type and Unit Cost") +
+    ylab("Item Type")
 
 ```
 ```{r}
@@ -436,4 +450,4 @@ ggplot(dfPred, aes(predictions)) +
 
 #### E. Conclusion
 
-Item types were predicted from other aspects of country sales records, such as total profits, region, unit sales, priority, etc. Because each item type is associated with exactly one unit price, there is going to be 
+Item types were predicted from other aspects of country sales records, such as total profits, region, unit sales, priority, etc. Random forest outperfomred multinomial regression for both datasets.  The smaller dataset suffered from low n and sparseness - with a corresponding drop in accuracy.
