@@ -1,0 +1,459 @@
+---
+title: "Eric_Hirsch_622_Assignment_1"
+subtitle: "Predicting Sales Data" 
+author: "Eric Hirsch"
+date: "10/7/2022"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+#devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
+library(patchwork)
+library(gridExtra)
+library(ggsci)
+library(caret)
+library(pROC)
+library(car)
+library(psych)
+library(patchwork)
+library(tidytable)
+library(MASS)
+library(lubridate)
+library(e1071)
+library(caTools)
+library(class)
+#library(mice)
+```
+```{r}
+
+df2 <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_5000.csv")
+
+```
+
+### Predicting item type in sales data records 
+
+In this analysis, we review two sets of VBA-generated sales data records, one large (5,000) and one small (100).  The data includes categorical and numerical data - the numerical data are largely collinear with each other as they represent all the components of profit - unit sales, unit price, total revenue, total cost and so on. Categorical predictors include Region, Country, Item Type, Sales channel, and Order Priority.  There are, additionally, order and shipping dates. There are no missing values.
+
+Because this is not "real" data, there are some unusual characteristics to the data shape. Perhaps the most unusual feature of the data is a one-to-one match between unit cost and item type.  There are some other unusual findings as well - for example, we might expect the distribution of the lag time between order and shipment to be skewed right (most lags would be small and very large lags would rare), but instead it is uniform. Order ID, normally a throwaway variable, is moderately negatively correlated with revenue. This means we will need to rely heavily on the data and not make too many inferences based on common sense or business knowledge.
+
+In order to address the multicollinearity in the dataset, we remove a number of predictors - we eliminate country and retain region, we eliminate shipping date but create a new variable for lag between order and shipping, and we eliminate most numerical variables except total profit and one other variable (because the same profit may be generated from high volume or low volume.)  We retain units sold, because it has little relationship to unit cost (r=-.02) and moderate (relative to the other variables!) correlation with total profit (.58). We also remove order ID, despite its predictive power in this dataset, to make our analysis more meaningful. 
+
+Having wrangled the dataset, we explore opportunities to use machine learning to make predictions about the data.  There are a number of labeled classes that would work here. Analysis suggests that item type would lend itself well to prediction, which makes sense since unit price is correlated with total profit and is a perfect match with item type. However, we choose first to examine region, which appears to be a more challenging and interesting exercise. It turns out that in practice, region shows little correlation with the other variables and prediction (not included below) does not perform better than random.
+
+We choose, therefore, to predict item type.  Machine learning practices do not exist in isolation from business use cases, so we construct one in order to guide our analysis. We imagine an intern has inadvertently eliminated item cost and item type from a dataset of sales records and we need to reconstruct them for a presentation to our parent company that afternoon.  We have only this morning to reconstruct the data (which limits the amount of data we can process), but because it is only a general presentation we don't need to be fully accurate (80% accuracy will do).  For the purpose of the presentation we don't need to be able to make inferences about item type, but we should know enough about how the predictions are being made in order to be comfortable that the process was done properly.
+
+We now consider machine learning algorithms to correct the problem.
+
+A number of factors weigh in on our decision of which models to choose.  We know that:
+
+* we have multiple classes to predict
+* the classes are relatively balanced
+* total profit, a key predictor, is not normally distributed (but could be transformed if need be)
+* many of our predictors are categorical, but they may be overshadowed by total profit
+* we likely have enough records in the larger dataset to avoid the "curse of dimensionality" but possibly not the smaller
+* the larger dataset is probably near, but not at, the limit of what our resources can comfortably handle - if our predictions are inadequate we can increase the size of the dataset.
+
+Given these conditions, we choose one parametric (Multinomial Regression) and one non-parametric method (Random Forest) in order to compare them. Both algorithms generally perform well under the circumstances above.  Because the parametric method relies on statistical assumptions, it will be as good as those assumptions are accurate.  Our analysis shows that the relationship between total profit and item type, insofar as total profit relies on item cost, is linear with a log transformation, so we take a log transformation of total profit for this analysis.   
+
+Our parametric method (Multinomial Regression) is likely be simpler, faster and require less data than our nonparametric one.  However, it may not create as good a fit with the data.  Our nonparametric method (Random Forest) requires more data and will be slower, but will likely create a better fit.  This may lead to more accuracy, or conversely the method may overfit the data.  MR additionally has the advantages that it may be more interpretable and, because we get probabilities instead of firm classes, it may be more flexible in terms of how we apply it.  
+
+We use 10-fold cross validation and apply both methods to the training data. Without doing any custom tuning, both perform well, but random forest significantly outperforms multinomial regression, with a mean 88% vs 48% accuracy respectively on the training set.  A log transformation of total profit improves the multinomial regression to a mean of 53%. We then use RF to predict our classes and we achieve 87% accuracy, which exceeds our business case benchmark.
+
+An analysis of influential factors and a look at an example of one tree, however, shows something important about our exercise.  Total profit is almost exclusively the only factor random forest uses in determining item type, suggesting that the exercise is perhaps somewhat trivial. This was the risk we took when we retained total profit despite knowing about the relationship between profit, unit cost and item type. To create a more interesting analysis, it might have been better to leave profit out - a quick examination of one tree without total profit shows the influence of order lag, units sold, region and order date, a finding that is corroborated by earlier analysis that showed the correlation between item type and these predictors.
+
+Following this exercise, we examine the smaller dataset and make some comparisons with the larger. Since the 5,000 database is generated by the same VBA algorithm s this one, we would expect similarities. 
+
+Multicollinearity and distributions look similar. Unit costs and item types continue to match one-to-one. The standard deviation of total profit is higher, as is the mean.  Not surprisingly, this dataset behaves just as if it were a sample of the larger one, with similar characteristics except that sample means and standard deviations are further from the population compared to the larger one.  
+
+A distribution of classes shows how sparse the data has become.  Some classes have 3 or less members and some are missing altogether. These "curse of dimensionalitity" issues are likely to hurt the analysis.
+
+With less data to train on and more variation in the dataset, we expect a loss of predictive power. In fact, our accuracy on the training set degrades to .37% (was 87%) and .28% (was 53%) for RF and MR respectively.  Because the data is so sparse, the classes in the training set don't match those in the evaluation set so we can't do predictions. 
+
+In the business use case we would be satisfied with our results on the 5,000 record database, understanding that in the vast majority of cases, item type is going to be determined almost entirely by the profit margin. We use our algorthm to predict the missing records and send it off to our data visualization department for the presentation.
+
+
+### 1. Data Exploration
+
+
+#### A. Summary Statistics
+
+For this exercise we will examine the 5,000 record and 100 record datasets from the assignment website. 
+
+The datasets contain fabricated sales orders generated by VBA for the purpose of practicing analysis.  There are 14 columns, including 7 numeric columns, 5 character and two date. One of the predictors is an ID so we drop it. Here is a summary of the remaining 13 variables:
+
+```{r}
+
+df2 <- df2 %>%
+  dplyr::select(-Order.ID)
+
+summary(df2)
+str(df2)
+
+df2$Item.Type <- factor(df2$Item.Type)
+df2$Region <- factor(df2$Region)
+
+```
+
+#### B. Multicollinearity
+
+We suspect a high degree of multicollinearity among the numeric variables, since they are components of each other - for example, total profits is made up of costs and revenues, while revenues are determined by prices and volume.  We also may assume that order date and shipping date are related, and country and region will also be directly related.
+
+The heatmap below shows the multicollinearity among the economic variables.
+
+
+```{r}
+
+df2Num <- df2 %>%
+  dplyr::select_if(is.numeric)
+
+z <- EHExplore_Multicollinearity(df2Num, printCorrs = TRUE, title="Multicollinearity Among Economic Variables")
+
+
+```
+There are many different strategies we can take with the issue of multicollinearity, but because certain columns completely duplicate the information of other columns, we can't ignore it.  We choose, for now, to retain a minimum of variables - Total Profit (as it summarizes most of the others), and, because the same profit may come from high revenue and high costs or low revenue and low costs, we include Unit Cost as well. (Unit cost has the lowest correlation with Total Profit of all the predictors (r=.51)).
+
+As for dates, we convert order date to an integer representing the number of days that have passed since 1/1/2000.  We also create a new variable, Order.Lag, since the difference between order date and shipping date might be predictive.
+
+Finally, we eliminate country and retain region. This leaves us a dataframe of 8 variables.
+
+```{r}
+
+df2$Order.Date <- as.Date(df2$Order.Date, format="%m/%d/%Y")
+df2$Ship.Date <- as.Date(df2$Ship.Date, format="%m/%d/%Y")
+
+df2$Order.Lag <- as.integer(df2$Ship.Date-df2$Order.Date)
+df2$OrderDaysSince2000 <- as.integer(df2$Ship.Date-as.Date("2000-01-01"))
+
+df3 <- df2 %>%
+    dplyr::select(-Order.Date, -Ship.Date, -Country, -Unit.Price, -Total.Revenue, -Total.Cost, -Units.Sold)
+```
+
+```{r}
+summary(df3)
+```
+#### C. Distributions
+
+When we examine the distributions of the numeric variables, we find that Total profit is highly skewed, total cost is somewhat skewed, and the date variables are relatively uniform.  There are many odd gaps in the cost distribution, which appears to be a series of discrete values. We may consider doing a log transformation of profit if need be. Since the data is fabricated, the uniformity of the date distributions suggests to me that these dates are just pulled randomly from a uniform distribution and won't be useful.
+
+Not surprisingly, a boxplot shows a great number of outliers for total profits - this is consistent with the skew in the distribution.
+
+```{r}
+
+a <- EHSummarize_SingleColumn_Histograms(df3)
+grid.arrange(grobs=a[c(1:4)])
+
+a <- EHSummarize_SingleColumn_Boxplots(df3)
+grid.arrange(grobs=a[2])
+```
+
+#### D. Relationships
+
+We can run a regression on total profit just to get an idea of some of the relationships between the numeric and categorical variables.  We can see from this exploration that item types are strongly correlated with profits, as are medium priority items, but nothing else is. Unit cost could not be calculated because of singularities. We know unit cost is not fully correlated with total profit, so it must be fully correlated with another variable or in conjunction with other variables.
+
+```{r}
+
+x <- lm(Total.Profit ~., data=df3)
+summary(x)
+```
+This analysis suggests that item type may be the most reasonable class to predict.  However, region may also work, if it is correlated with some of the other variables besides profit.  We can test this conjecture with some further analysis. 
+
+Bar charts and boxplots show relatively little relationship between region and item type, sales channel, and order priority.
+
+```{r}
+a <- EHExplore_TwoCategoricalColumns_Barcharts(df3, "Region")
+grid.arrange(grobs=a[c(2)])
+grid.arrange(grobs=a[c(3:4)])
+
+```
+```{r}
+
+ggplot(df2, aes(Region, Order.Lag)) +
+  geom_boxplot() +
+  coord_flip()
+ggplot(df2, aes(Region, OrderDaysSince2000)) +
+  geom_boxplot() +
+  coord_flip()
+ggplot(df2, aes(Region, Unit.Cost)) +
+  geom_boxplot() +
+  coord_flip()
+
+```
+
+
+####. E. Choosing item type as the variable to predict
+
+We therefore choose Item Type to predict for this analysis.  As with region, we can ask, "how does it correlate with the non-economic variables?"  Item type shows some relationship with order lag and order date.  However, the most striking relationship is with unit cost.  Now we see the source of the singularity - each item type has one, and only one, unit cost and vice versa.  The two are completely correlated.  When we take the log of unit cost, we see a relatively linear relationship.  Just to be sure, a regression shows an R2 of 1.
+
+```{r}
+
+a <- EHExplore_TwoCategoricalColumns_Barcharts(df3, "Item.Type")
+grid.arrange(grobs=a[c(3:4)])
+
+```
+
+```{r}
+
+df2a <- df2
+
+ggplot(df2a, aes(Item.Type, Order.Lag)) +
+  geom_boxplot() +
+  coord_flip()
+ggplot(df2a, aes(Item.Type, OrderDaysSince2000)) +
+  geom_boxplot() +
+  coord_flip()
+
+df2a$Item.Type <- as.factor(df2a$Item.Type)
+ggplot(df2a, aes(Unit.Cost, fct_reorder(Item.Type,
+                         Unit.Cost))) +
+  geom_point() +
+  ggtitle("Item Type and Unit Cost") +
+    ylab("Item Type")
+
+
+df2a$Unit.Cost = log(df2a$Unit.Cost)
+df2a$Item.Type <- as.factor(df2a$Item.Type)
+
+ggplot(df2a, aes(Unit.Cost, fct_reorder(Item.Type,
+                         Unit.Cost))) +
+  geom_point() +
+  ylab("Item Type") +
+  xlab("Log(Unit Cost)") +
+  ggtitle("Item Type and Log of Unit Cost")
+
+```
+
+
+```{r}
+dfx3 <- df3 %>%
+  dplyr::select(Unit.Cost, Item.Type)
+
+x <- lm(Unit.Cost ~Item.Type, data=dfx3)
+summary(x)
+
+```
+
+With unit cost in the analysis, a machine learning exploration is not justified, since a lookup table in Excel would perform just as well. We will retain total profit, and add Units.Sold, which has little correlation with Unit.Cost.  We remove Unit.Cost, add Units.Sold, dummify the categorical variables and scale all the predictors.
+
+```{r}
+
+z=list("Item.Type")
+
+df3a <- df3 %>%
+  dplyr::select(-Unit.Cost)
+
+df3a$Units.Sold <- scale(df2$Units.Sold)
+
+df3b <- EHPrepare_CreateDummies(df3a, exclude=z, dropFirst=TRUE)
+df4 <- EHPrepare_ScaleAllButTarget(df3b, "Item.Type")
+
+df4$Total.Profit = log(df4$Total.Profit+10)
+
+```
+
+
+### 2. Models
+
+
+#### A. Preparing the data
+
+The data needs to be partitioned into a training set and an evaluation set. We examine our classes in the training set and see that they are relatively uniform.
+
+```{r}
+set.seed(042760)
+i <- createDataPartition(df4$Item.Type, p=0.80, list=FALSE)
+dfEval <- df4[-i,]
+dfTrain <- df4[i,]
+
+dfTrain %>% count(Item.Type)
+
+```
+
+
+#### B. Selecting Models
+
+A number of factors weigh in to our decision of which models to choose.  We know that we have multiple classes to predict, that total profit, a key predictor, is not normally distributed, and that, given the strong match between item type and unit cost on the one hand and total profits and unit costs on the other, classes are likely to be relatively separate. Many of our predictors are categorical so we don't expect strong linear relationships.  The number of categories is small compared to the number of records, so our data is not sparse.  
+
+
+Random Forest (RF) and multinomial regression (MR) will likely perform well under these conditions, so this is what we choose. MR has the advantages that it may be more interpretable and, because we get probabilities instead of firm classes, it is more flexible.  
+
+We have chosen one parametric (MR) and one non-parametric method (RF). The parametric method will likely be simpler, faster and require less data.  However, it may not create as good a fit with the data.  The nonparametric method (RF) requires more data and will be slower, but will likely create a better fit.  This will lead to more accuracy, (unless the paradigm overfits the data which is more of a concern here than with MR.)
+
+
+We will use 10-fold cross validation.
+
+```{r, messages=FALSE, echo=FALSE}
+
+tc <- trainControl(method="cv", number=10)
+metric <- "Accuracy"
+
+set.seed(042760)
+multinom <- train(Item.Type~., data=dfTrain, method="multinom", metric=metric, trControl=tc)
+rf <- train(Item.Type~., data=dfTrain, method="rf", metric=metric, trControl=tc)
+```
+
+```{r}
+summary(multinom)
+results <- resamples(list(Multinomial=multinom, RandomForest=rf))
+summary(results)
+dotplot(results)
+```
+Random Forest performs quite well.  Mean accuracy is 88% at mtry = 14.  
+
+#### C. Making Predicions
+
+Now we test our random forest model on the evaluation set.  We see that certain classes (beverages, fruits and personal care) are predicted very well, while others (meat, snacks) perform less well.  An analysis of why is beyond the scope of this exercise.
+
+```{r}
+print(rf)
+
+```
+
+```{r}
+predictions <- predict(rf, dfEval)
+x <- factor(dfEval$Item.Type)
+confusionMatrix(predictions, x)
+
+dfPred <- as.data.frame(predictions)
+ggplot(dfPred, aes(predictions)) +
+  geom_bar() +
+  coord_flip()
+```
+
+Which factors are most important? We can see that total profit is driving the analysis. Decision trees leaving total profit in and taking it out make this more clear.
+
+```{r}
+varImp(rf)
+
+
+dt <- train(Item.Type~., data=dfTrain, method="rpart", metric=metric, trControl=tc)
+library(rpart.plot)
+rpart.plot(dt$finalModel)
+
+dfTrain2 <- dfTrain %>%
+  dplyr::select(-Total.Profit)
+
+dt <- train(Item.Type~., data=dfTrain2, method="rpart", metric=metric, trControl=tc)
+
+library(rpart.plot)
+rpart.plot(dt$finalModel)
+```
+
+
+#### D. Analyzing the Smaller Dataset
+
+Now we examine the smaller dataset and make some comparisons. Since the 5000 database is a superset of this one, we would expect similarities. 
+
+Multicollinearity and distributions look the similar. Unit Costs and Item Types continue to match one to one. The standard deviation of Total.Profit is higher, as is the mean.  This dataset looks like a sample of the larger one, wth our sample means and standard deviations further from the population compared to the larger one.  
+
+A distribution of classes also shows how sparse the data has become.  Some classes have 3 or less members and some are missing altogether. These "curse of dimensionality" issues are going to hurt the analysis.
+
+With less data to train on and more variation in the dataset, We expect a loss of predictive power with the drop in n. In fact, our accuracy on the training set degrades to .37% (was 87%) and .28% (was 53%) for RF and MR respectively.  Because the data is so sparse, the classes in the training set don't match those in the evaluation set so we can't do predicitons.
+
+```{r}
+
+df2Small <- read.csv("D:\\RStudio\\CUNY_622\\1\\Salesdata_100.csv")
+
+dfSmall <- df2Small %>%
+  dplyr::select(-Order.ID)
+
+summary(dfSmall)
+```
+```{r}
+
+sd(df2$Total.Profit)
+sd(dfSmall$Total.Profit)
+
+mean(df2$Total.Profit)
+mean(dfSmall$Total.Profit)
+
+dfSmallNum <- dfSmall %>%
+  dplyr::select_if(is.numeric)
+
+z <- EHExplore_Multicollinearity(dfSmallNum, title="Multicollinearity Among Economic Variables")
+a <- EHSummarize_SingleColumn_Histograms(dfSmall)
+grid.arrange(grobs=a[c(1:6)])
+
+dfSmall$Item.Type <- as.factor(dfSmall$Item.Type)
+ggplot(dfSmall, aes(Unit.Cost, fct_reorder(Item.Type,
+                         Unit.Cost))) +
+  geom_point() +
+  ggtitle("Item Type and Unit Cost") +
+    ylab("Item Type")
+
+```
+```{r}
+df2 <-dfSmall
+
+df2$Item.Type <- factor(df2$Item.Type)
+df2$Region <- factor(df2$Region)
+
+df2$Order.Date <- as.Date(df2$Order.Date, format="%m/%d/%Y")
+df2$Ship.Date <- as.Date(df2$Ship.Date, format="%m/%d/%Y")
+
+df2$Order.Lag <- as.integer(df2$Ship.Date-df2$Order.Date)
+df2$OrderDaysSince2000 <- as.integer(df2$Ship.Date-as.Date("2000-01-01"))
+
+df3 <- df2 %>%
+    dplyr::select(-Order.Date, -Ship.Date, -Country, -Unit.Price, -Total.Revenue, -Total.Cost, -Units.Sold)
+
+
+z=list("Item.Type")
+
+df3a <- df3 %>%
+  dplyr::select(-Unit.Cost)
+
+df3a$Units.Sold <- scale(df2$Units.Sold)
+
+df3b <- EHPrepare_CreateDummies(df3a, exclude=z, dropFirst=TRUE)
+df4 <- EHPrepare_ScaleAllButTarget(df3b, "Item.Type")
+
+df4$Total.Profit = log(df4$Total.Profit+10)
+
+set.seed(042760)
+i <- createDataPartition(df4$Item.Type, p=0.80, list=FALSE)
+dfEval <- df4[-i,]
+dfTrain <- df4[i,]
+
+dfTrain %>% count(Item.Type)
+
+tc <- trainControl(method="cv", number=10)
+metric <- "Accuracy"
+
+set.seed(042760)
+multinom <- train(Item.Type~., data=dfTrain, method="multinom", metric=metric, trControl=tc)
+rf <- train(Item.Type~., data=dfTrain, method="rf", metric=metric, trControl=tc)
+
+```
+
+```{r}
+
+results <- resamples(list(Multinomial=multinom, RandomForest=rf))
+summary(results)
+dotplot(results)
+
+```
+```{r}
+
+
+predictions <- predict(rf, dfEval)
+x <- factor(dfEval$Item.Type)
+#confusionMatrix(predictions, x)
+
+dfPred <- as.data.frame(predictions)
+ggplot(dfPred, aes(predictions)) +
+  geom_bar() +
+  coord_flip()
+```
+
+#### E. Conclusion
+
+Item types were predicted from other aspects of country sales records, such as total profits, region, unit sales, priority, etc. Random forest outperformed multinomial regression for both datasets.  The smaller dataset suffered from low n and sparseness - with a corresponding drop in accuracy.
