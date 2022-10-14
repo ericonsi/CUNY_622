@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 
 ```{r, include=FALSE}
 library(tidyverse)
-#devtools::install_github("ericonsi/EHData", force=TRUE)
+devtools::install_github("ericonsi/EHData", force=TRUE)
 library(EHData)
 library(patchwork)
 library(gridExtra)
@@ -33,6 +33,12 @@ library(caTools)
 library(class)
 #library(mice)
 ```
+```{r}
+
+devtools::install_github("ericonsi/EHData", force=TRUE)
+
+```
+
 
 ```{r}
 
@@ -218,66 +224,495 @@ predictions <- predict(rf, dfEval)
 x <- factor(dfEval$diagnois)
 confusionMatrix(predictions, x)
 ```
+xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
 ```{r}
 
-df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\Titanic.csv")
 
-df2 <- df1
+EHModel_DecisionTree <- function(df4, target, seed=042760, depth=31)
+{
+  
+  fla <- substitute(n ~ ., list(n = as.name(target)))
+  
+  set.seed(seed)
+  
+  i <- createDataPartition(df4[,target], p=0.8, list=FALSE)
+  
+  dfEval <- df4[-i,]
+  dfTrain <- df4[i,]
+  
+  dfTrain %>% count(target)
+  
+  tc <- trainControl(method="cv", number=10)
+  metric <- "Accuracy"
+  
+  
+  #predictions <- predict(rf, dfEval)
+  #dfPred <- as.data.frame(predictions)
+  
+  #  model performance
+  #x <- factor(dfEval$ptratio)
+  #confusionMatrix(predictions, x)
+  #RMSE(predictions,dfEval$ptratio)
+  #print(RMSE)
+  
+  #load Metrics package
+  #library(Metrics)
+  #rmse(dfEval$ptratio, dfPred$predictions)
+  
+  #densityplot(rf, adjust = 1.25)
+  
+  
+  #dfPred <- as.data.frame(predictions)
+  #ggplot(dfPred, aes(predictions)) +
+  #  geom_bar() +
+  #  coord_flip()
+  
+  #varImp(rf)
+  
+  
+  library(rpart)
+  
+  levels2= as.integer(depth-1)
+  output.tree <- rpart(fla, data = dfTrain, control = rpart.control(maxdepth = levels2))
+  
+  
+  library(rpart.plot)
+  
+  library(RColorBrewer)
+  
+  library(rattle)
+  
+  plot(output.tree)
+  
+  text(output.tree,pretty=0)
+  
+  summary(output.tree)
+  
+  fancyRpartPlot(output.tree)
+  
+  dt <- train(target~., data=dfTrain, method="rpart")
+  library(rpart.plot)
+  rpart.plot(dt$finalModel)
+  
+  
+  
+  return(dt)
+  
+}
+
+
+EHModel_DecisionTree2 <- function(df4, target, seed=042760, depth=100)
+{
+
+  fla <- substitute(n ~ ., list(n = as.name(target)))
+  
+  set.seed(seed)
+  
+  i <- createDataPartition(df4[,target], p=0.8, list=FALSE)
+  
+  dfEval <- df4[-i,]
+  dfTrain <- df4[i,]
+  
+  dfTrain %>% count(target)
+  
+  tc <- trainControl(method="cv", number=10)
+  metric <- "Accuracy"
+  
+  
+  #predictions <- predict(rf, dfEval)
+  #dfPred <- as.data.frame(predictions)
+  
+  #  model performance
+  #x <- factor(dfEval$ptratio)
+  #confusionMatrix(predictions, x)
+  #RMSE(predictions,dfEval$ptratio)
+  #print(RMSE)
+  
+  #load Metrics package
+  #library(Metrics)
+  #rmse(dfEval$ptratio, dfPred$predictions)
+  
+  #densityplot(rf, adjust = 1.25)
+  
+  
+  #dfPred <- as.data.frame(predictions)
+  #ggplot(dfPred, aes(predictions)) +
+  #  geom_bar() +
+  #  coord_flip()
+  
+  #varImp(rf)
+  
+  
+  library(rpart)
+  
+  output.tree <- rpart(fla, data = dfTrain, control = rpart.control(maxdepth = levels-1))
+  
+  
+  library(rpart.plot)
+  
+  library(RColorBrewer)
+  
+  library(rattle)
+  
+  plot(output.tree)
+  
+  text(output.tree,pretty=0)
+  
+  summary(output.tree)
+  
+  fancyRpartPlot(output.tree)
+  
+  dt <- train(target~., data=dfTrain, method="rpart")
+  library(rpart.plot)
+  rpart.plot(dt$finalModel)
+  
+  
+
+return(dt)
+
+}
+
+```
+
+
+```{r}
+library(tidyverse)
+#devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
+library(patchwork)
+library(gridExtra)
+library(ggsci)
+library(caret)
+library(pROC)
+library(car)
+library(psych)
+library(patchwork)
+library(tidytable)
+library(MASS)
+library(lubridate)
+library(e1071)
+library(caTools)
+library(class)
+#library(mice)
+
+df4 <- read.csv("D:\\RStudio\\CUNY_622\\2\\CrimeRate.csv")
+seed = 2
+levels = 4
+categorical = TRUE
+target = "target"
+
+  if (categorical) {
+    df4[, target] <- as.factor(df4[, target])
+  } 
+
+  fla <- substitute(n ~ ., list(n = as.name(target)))
+  
+  set.seed(seed)
+  
+  i <- createDataPartition(df4[,target], p=0.8, list=FALSE)
+  
+  dfEval <- df4[-i,]
+  dfTrain <- df4[i,]
+  
+  dfTrain %>% count(target)
+  
+  tc <- trainControl(method="cv", number=10)
+  metric <- "Accuracy"
+  
+  
+  #densityplot(rf, adjust = 1.25)
+  
+  
+  #dfPred <- as.data.frame(predictions)
+  #ggplot(dfPred, aes(predictions)) +
+  #  geom_bar() +
+  #  coord_flip()
+  
+  
+  library(rpart)
+  
+  levels2 = levels-1
+  output.tree <- rpart(fla, data = dfTrain, control = rpart.control(maxdepth = levels2))
+  
+  
+  library(rpart.plot)
+  
+  library(RColorBrewer)
+  
+  library(rattle)
+  
+  summary(output.tree)
+  
+  fancyRpartPlot(output.tree)
+  
+  dt <- train(target~., data=dfTrain, method="rpart")
+  library(rpart.plot)
+  rpart.plot(dt$finalModel)
+  
+  
+  predictions <- predict(dt, dfEval)
+  dfPred <- as.data.frame(predictions)
+  
+  if (categorical) {
+    x <- factor(dfEval[, target])
+    y <- confusionMatrix(predictions, x) 
+    print(y)
+  } else {
+  
+#load Metrics package
+library(Metrics)
+rmseval <- rmse(dfEval[,target], dfPred$predictions)
+print(paste('RMSE on test set: ', rmseval))
+}
+  
+df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\CrimeRate.csv")
+```
+
+```{r}
+
+#devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
+
+df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\CrimeRate.csv")
+
+a <- EHModel_DecisionTree(df1, "ptratio", levels = 5, categorical=FALSE, seed=147)
+b <- EHModel_RandomForest(df1, "ptratio", categorical=FALSE, seed = 356)
+
+
+```
+
+```{r}
+
+df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\CrimeRate.csv")
+
+df2 <- df1 
 
 summary(df2)
 str(df2)
 
+target = "zn"
 
+fla <- substitute(n ~ ., list(n = as.name(target)))
 
 df4 <- df2
-set.seed(042760)
-i <- createDataPartition(df4$Survived, p=0.80, list=FALSE)
+
+set.seed(042735)
+i <- createDataPartition(df4[, target], p=0.8, list=FALSE)
+
 dfEval <- df4[-i,]
 dfTrain <- df4[i,]
 
-dfTrain %>% count(Survived)
+dfTrain %>% count(target)
 
 tc <- trainControl(method="cv", number=10)
 metric <- "Accuracy"
 
-set.seed(042760)
-#multinom <- train(Survived~., data=dfTrain, method="multinom", metric=metric, trControl=tc)
-rf <- train(Survived~., data=dfTrain, method="rf", metric=metric, trControl=tc)
-summary(multinom)
-results <- resamples(list(Multinomial=multinom, RandomForest=rf))
-summary(results)
-dotplot(results)
+set.seed(042735)
+rf <- train(target~., data=dfTrain, method="rf")
+rf
 
 print(rf)
+plot(rf)
 
 
 predictions <- predict(rf, dfEval)
-x <- factor(dfEval$Survived)
-confusionMatrix(predictions, x)
+dfPred <- as.data.frame(predictions)
+
+#  model performance
+#x <- factor(dfEval$zn)
+#confusionMatrix(predictions, x)
+RMSE(predictions,dfEval$zn)
+print(RMSE)
+print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
+#load Metrics package
+library(Metrics)
+rmse(dfEval$zn, dfPred$predictions)
+
+densityplot(rf, adjust = 1.25)
+#xyplot(rf)
+
 
 dfPred <- as.data.frame(predictions)
 ggplot(dfPred, aes(predictions)) +
   geom_bar() +
   coord_flip()
 
+varImp(rf)
+
+```
+```{r}
+
+df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\wine_csv.csv")
+
+df2 <- df1 
+
+summary(df2)
+str(df2)
+
+#df2$ptratio <- as.factor(df2$ptratio)
+
+df4 <- df2
+set.seed(042735)
+i <- createDataPartition(df4$ptratio, p=0.8, list=FALSE)
+dfEval <- df4[-i,]
+dfTrain <- df4[i,]
+
+dfTrain %>% count(ptratio)
+
 tc <- trainControl(method="cv", number=10)
 metric <- "Accuracy"
 
-set.seed(042760)
-multinom <- train(Survived~., data=dfTrain, method="multinom", metric=metric, trControl=tc)
-rf <- train(Survived~., data=dfTrain, method="rf", metric=metric, trControl=tc)
+set.seed(042735)
+rf <- train(ptratio~., data=dfTrain, method="rf")
 
-summary(multinom)
-results <- resamples(list(Multinomial=multinom, RandomForest=rf))
-summary(results)
-dotplot(results)
+print(rf)
+plot(rf)
+
+
+predictions <- predict(rf, dfEval)
+dfPred <- as.data.frame(predictions)
+
+#  model performance
+#x <- factor(dfEval$ptratio)
+#confusionMatrix(predictions, x)
+RMSE(predictions,dfEval$ptratio)
+print(RMSE)
+
+#load Metrics package
+library(Metrics)
+rmse(dfEval$ptratio, dfPred$predictions)
+
+densityplot(rf, adjust = 1.25)
+#xyplot(rf)
+
+
+dfPred <- as.data.frame(predictions)
+ggplot(dfPred, aes(predictions)) +
+  geom_bar() +
+  coord_flip()
 
 varImp(rf)
 
+output.tree <- rpart(ptratio~.,data = dfTrain)
 
-dt <- train(Survived~., data=dfTrain, method="rpart", metric=metric, trControl=tc)
+library(rpart.plot)
+
+library(RColorBrewer)
+
+library(rattle)
+
+plot(output.tree)
+
+text(output.tree,pretty=0)
+
+summary(output.tree)
+
+fancyRpartPlot(output.tree)
+
+
+dt <- train(ptratio~., data=dfTrain, method="rpart",  minsplit = 2,   minbucket = 1, cp=-1)
 library(rpart.plot)
 rpart.plot(dt$finalModel)
+```
+
+```{r}
+
+df2Num <- df2 %>%
+  dplyr::select_if(is.numeric)
+
+z <- EHExplore_Multicollinearity(df2Num, printCorrs = TRUE, threshold=.75, printHighest=TRUE, title="Multicollinearity")
+
+
+
+```
+yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+
+```{r}
+df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\wine_csv.csv")
+
+df2 <- df1
+
+summary(df2)
+str(df2)
+
+#df2$alcohol <- as.factor(df2$alcohol)
+
+df4 <- df2
+set.seed(042735)
+i <- createDataPartition(df4$alcohol, p=0.8, list=FALSE)
+dfEval <- df4[-i,]
+dfTrain <- df4[i,]
+
+dfTrain %>% count(alcohol)
+
+tc <- trainControl(method="cv", number=10)
+metric <- "Accuracy"
+
+set.seed(042735)
+rf <- train(alcohol~., data=dfTrain, method="rf")
+
+print(rf)
+plot(rf)
+
+
+predictions <- predict(rf, dfEval)
+dfPred <- as.data.frame(predictions)
+
+#  model performance
+#x <- factor(dfEval$alcohol)
+#confusionMatrix(predictions, x)
+RMSE(predictions,dfEval$alcohol)
+print(RMSE)
+
+#load Metrics package
+library(Metrics)
+rmse(dfEval$alcohol, dfPred$predictions)
+
+densityplot(rf, adjust = 1.25)
+#xyplot(rf)
+
+
+dfPred <- as.data.frame(predictions)
+ggplot(dfPred, aes(predictions)) +
+  geom_bar() +
+  coord_flip()
+
+varImp(rf)
+
+library(rpart)
+
+set.seed(1234)
+
+output.tree <- rpart(alcohol~.,data = dfTrain)
+
+library(rpart.plot)
+
+library(RColorBrewer)
+
+library(rattle)
+
+plot(output.tree)
+
+text(output.tree,pretty=0)
+
+summary(output.tree)
+
+fancyRpartPlot(output.tree)
+
+
+dt <- train(alcohol~., data=dfTrain, method="rpart",  minsplit = 2,   minbucket = 1, cp=-1)
+library(rpart.plot)
+rpart.plot(dt$finalModel)
+```
+
+```{r}
+
+df2Num <- df2 %>%
+  dplyr::select_if(is.numeric)
+
+z <- EHExplore_Multicollinearity(df2Num, printCorrs = TRUE, threshold=.75, printHighest=TRUE, title="Multicollinearity")
+
 ```
 
 ### Predicting item type in sales data records 
@@ -589,3 +1024,5 @@ rpart.plot(dt$finalModel)
 #### E. Conclusion
 
 Item types were predicted from other aspects of country sales records, such as total profits, region, unit sales, priority, etc. Random forest outperformed multinomial regression for both datasets.  The smaller dataset suffered from low n and sparseness - with a corresponding drop in accuracy.
+
+
