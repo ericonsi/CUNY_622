@@ -1,0 +1,53 @@
+---
+title: "Eric_Hirsch_622_Assignment_1"
+subtitle: "Predicting Sales Data" 
+author: "Eric Hirsch"
+date: "10/7/2022"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
+library(patchwork)
+library(gridExtra)
+library(ggsci)
+library(caret)
+library(pROC)
+library(car)
+library(psych)
+library(patchwork)
+library(tidytable)
+library(MASS)
+library(lubridate)
+library(e1071)
+library(caTools)
+library(class)
+#library(mice)
+```
+
+```{r}
+
+#devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
+
+
+
+df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\CrimeRate.csv")
+
+summary(df1)
+
+a <- EHModel_DecisionTree(df1, "ptratio", levels = 3, categorical=FALSE, seed=147)
+b <- EHModel_RandomForest(df1, "ptratio", categorical=FALSE, seed = 356)
+
+
+```
+
