@@ -45,8 +45,8 @@ df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\CrimeRate.csv")
 
 summary(df1)
 
-a <- EHModel_DecisionTree(df1, "ptratio", levels = 3, categorical=FALSE, seed=147)
-b <- EHModel_RandomForest(df1, "ptratio", categorical=FALSE, seed = 356)
+a <- EHModel_DecisionTree(df1, "rad", levels = 4, categorical=FALSE, seed=147)
+b <- EHModel_RandomForest(df1, "rad", categorical=FALSE, seed = 356)
 
 
 ```
