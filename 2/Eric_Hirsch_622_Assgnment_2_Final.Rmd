@@ -100,7 +100,7 @@ tab
 ```
 
 
-Now imagine you are a data scientist working for the Department of Education tasked with predicting the pupil-student ratio in various suburbs where the information is not readily available. Hundreds of thousands of tax dollars to support underserved students depend on the calculation so you need to be as accurate as possible.  Your department has the time and resources to apply whatever model you create to any new data you receive.  Given the table above, random forest is the best choice as it outperforms a single decision tree when predicting ptratio (RMSE = 7.5 vs. RMSE = 1.5 for the decision tree)..
+Now imagine you are a data scientist working for the Department of Education tasked with predicting the pupil-student ratio in various suburbs where the information is not readily available. Hundreds of thousands of tax dollars to support underserved students depend on the calculation so you need to be as accurate as possible.  Your department has the time and resources to apply whatever model you create to any new data you receive.  Given the table above, random forest is the best choice as it outperforms a single decision tree when predicting ptratio (RMSE = 7.5 vs. RMSE = 1.5 for the decision tree).
 
 When creating a random forest algorithm in R, there are a number of parameters we can tune. The most important of these are mtry (the number of variables drawn randomly for each split), ntree (the number of trees to grow) and maxnode (the maximum amount of terminal nodes in the forest).  While the caret package automatically optimizes parameters for random forest, the parameters can also be tuned manually. However, manual tuning of the parameters did not result in a lower RMSE in the evaluation set than out of the box tuning.
 
