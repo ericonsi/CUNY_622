@@ -1,8 +1,8 @@
 ---
-title: "Eric_Hirsch_621_Assignment_3"
-subtitle: "Predicting Town Crime Rates" 
+title: "The Case for Decision Trees"
+subtitle: "CUNY 622 - Assignment 2" 
 author: "Eric Hirsch"
-date: "4/7/2022"
+date: "10/23/2022"
 output:
   pdf_document:
     toc: true
@@ -25,359 +25,129 @@ library(pROC)
 library(car)
 
 ```
+
 ```{r}
 
-df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
-dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
+df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\CrimeRate.csv")
 
 ```
 
 
+#### Introduction
 
+Random Forest and Decision Trees are both non-parametric machine learning algorithms for predicting target variables from a set of independent variables. They may be used for classification or regression.  Decision trees work by splitting a source set into subsets, which may be further split depending on the data.  Random Forest is an ensemble learning algorithm which constructs a multitude of trees and takes the majority (in classification) or average (in regression) to make its prediction. By pooling the information from multiple trees, Random Forests compensate for the tendency of Decision Trees to overfit the data.  For this reason, Random Forests generally significantly outperform single trees in terms of prediction.
 
-### 1. Data Exploration
+However, the evaluation of algorithm performance can only be made in the context of a use case. For many use cases, particularly those where time and other resources are scarce and/or interpretability is more important, Decision Trees will be the better choice. We illustrate this with a dataset of data related to suburbs in the Boston area.
 
-
-#### A. Summary Statistics
-
-We first examine the data. The dataset consists of 466 observations and 13 variables, all numeric.  Two are binary, including the target. There are no missing values.  The target appears to be relatively balanced (which makes sense, as it is an indicator of being above or below the median.)   
+The data set consists of 466 observations with 11 numeric variables and two binary variables. There are no missing values. The variables include the level of industrialization, average tax rates, pollution levels, and so on. This data set is often used to predict crime rates, but we won’t use it for that purpose. A summary appears below:
 
 ```{r}
 
-summary(df)
-str(df)
+summary(df1)
 
 ```
 
+When we examine histograms we see that a number of variables have distributions that are broken and uneven (zn, indus, nox and rad), suggesting possible hidden groupings. This may lend itself well to decision tree/random forest algorithms.  Many of the distributions are also skewed.
+ 
 ```{r}
+
 library(psych)
 
-a <- EHSummarize_StandardPlots(df, "target", type="box")
+a <- EHSummarize_SingleColumn_Histograms(df1)
+grid.arrange(grobs=a, ncol=3, nrow=5)
+
 ```
 
-Looking at boxplots, histograms, and boxplots against the target variable, we see some areas of interest.  A number of distributions are broken (e.g. zn, indus, nox and rad ), suggesting there may be hidden grouping within the variables.  For example, zn = 0 may include areas that are different in their makeup from zn>0.  In fact, there may be a common phenomenon among all of them which identifies certain areas as highly industrial with a different crime logic, as opposed to the mixed industrial and residential areas for the rest of the observations.  
-
-Most of the correlations are unsurprising, with the exception of tax rate, which increases with increase in crime.  Again, this may reflect some interaction, since residential and industrial areas may both be high tax areas, but residential areas may see more crime as they become industrial, whereas industrial areas may see less (as the # of residents approaches 0).
-
-#### B. Multicollinearity
-
-Mutlicollinearity is highly evident in the database - not surprisingly, given the discussion above.  The correlation between rad and tax is over 90%. We also see here the correlation between tax rate and level of industrialization (which is also correlated with high crime rates), which explains the counterintuitive result above. 
+There is also a great deal of multicollinearity. The highest correlation (over 90%) is between rad and tax.  We will drop the tax rate to avoid problems with interpretation later on. 
 
 ```{r}
-EHExplore_Multicollinearity(df)
+a <- EHExplore_Multicollinearity(df1)
 
 
 ```
 
-### 2. Data Preparation
+#### When Random Forest Works Better
 
-#### A. Interaction terms
-
-As stated before, the dataset appears to hold the potential for many interaction terms, as many distributions suggest areas of very low industrialization and very high industrialization, which may affect the slope of other variables.  We create some dummy variables and look for interactions.  These are the dummy variables we've chosen, based on the histograms above:
-
-    TaxOver600
-    radOver10
-    ptOver14
-    lstatOver12
-    IndusOver16
-    ZnOver0
-    NoxOverPoint8
-    MedvBelow50
-
-The following are just some of the possible interactions we discover affecting the dataset:
+The table below illustrates how much more effective random forests are than decision trees in making predictions.  Random forests and decision tree models were constructed for seven selected variables in dataset, predictions were made on an evaluation set, and RMSEs were calculated.  The random forest models were superior at predicting in every case.  The package used here is the CARET. 
 
 ```{r}
 
-dfInt <- df %>%
-    mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
-    mutate(radOver10 = ifelse(rad>=10,1,0)) %>%
-    mutate(ptOver14 = as.numeric(ifelse(ptratio>=14,1,0))) %>%
-    mutate(lstatOver12 = ifelse(lstat>=12,1,0)) %>%
-    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
-    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
-    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
-    mutate(MedvBelow50 = ifelse(medv<50,1,0))
-
-dfEval <- dfEval %>%
-    mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
-    mutate(radOver10 = ifelse(rad>=10,1,0)) %>%
-    mutate(ptOver14 = as.numeric(ifelse(ptratio>=14,1,0))) %>%
-    mutate(lstatOver12 = ifelse(lstat>=12,1,0)) %>%
-    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
-    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
-    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
-    mutate(MedvBelow50 = ifelse(medv<50,1,0))
-
-a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ZnOver0")
-b <- EHExplore_Interactions_Scatterplots(dfInt, "target", "IndusOver16")
-c <- EHExplore_Interactions_Scatterplots(dfInt, "target", "radOver10")
-d <- EHExplore_Interactions_Scatterplots(dfInt, "target", "TaxOver600")
-e <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ptOver14")
-
-x <- c(a[2], a[5], a[9], b[4], b[6], c[11], d[10], e[8], e[2], e[9])
-
-grid.arrange(grobs=x, ncol=3, nrow=4)
+tab <- matrix(c(13.6, 5.7, 3.8, 1.1, .07, .03, 4.8, 3.4, 62.3, 27.1, 1.5, .75, 6.0, 3.2), ncol=2, byrow=TRUE)
+colnames(tab) <- c('Decision Tree-RMSE','Random Forest-RMSE')
+rownames(tab) <- c('zn','indus','nox', 'lstat', 'tax', 'ptratio', 'medv')
+tab <- as.table(tab)
+tab
 
 ```
 
-From these plots, we might draw a number of conclusions.  First, in the most highly industrialized areas the crime rate appears to be high no matter the other factors. Zone 0 areas behave differently from zone 1 areas. In the few schools where the pt ratio is very small, crime rates are high, even though in general crime rates increase as ptratio increases.  There may be other conclusions we can draw as well.
 
-These interactions may or may not prove useful.  We don't want to overfit the data, so it may be enough to simply include the dummy variables.
+Now imagine you are a data scientist working for the Department of Education tasked with predicting the pupil-student ratio in various suburbs where the information is not readily available. Hundreds of thousands of tax dollars to support underserved students depend on the calculation so you need to be as accurate as possible.  Your department has the time and resources to apply whatever model you create to any new data you receive.  Given the table above, random forest is the best choice as it outperforms a single decision tree when predicting ptratio (RMSE = 7.5 vs. RMSE = 1.5 for the decision tree)..
 
-#### B. Transformations
+When creating a random forest algorithm in R, there are a number of parameters we can tune. The most important of these are mtry (the number of variables drawn randomly for each split), ntree (the number of trees to grow) and maxnode (the maximum amount of terminal nodes in the forest).  While the caret package automatically optimizes parameters for random forest, the parameters can also be tuned manually. However, manual tuning of the parameters did not result in a lower RMSE in the evaluation set than out of the box tuning.
 
-When the predictor variable is normally distributed but with different variance for the two values of y, we may try a quadratic function of x.  rm may be considered a reasonable candidate for this.
-
-For skewed distributions, we may include both x and log(x).  nox, age, dis and lstat may be candidates for this. 
-
-Therefore we add the following transformations:
-
-rmSquared, nox_log, age_log, dis_log, lstat_log
-
-
-### 3. Build Models
-
-#### A. Base Model
-
-We begin with the base model (all original variables from the original dataset).  
-
-
-```{r}
-EHModel_Regression_Logistic(df, "target", splitRatio = 1)
-
-```
-
-In the base model, only 4 of the 12 predictors are not significant. AIC is 218. Through backward elimination we remove rm, lstat, chas and indus and arrive at a model with an AIC of 215.
-
-Now we split the dataset 80/20 and perform 100 training iterations to test model predictive power.  
-
-```{r include=FALSE}
-
-dfx <- df %>%
-  dplyr::select(-rm, -lstat, -chas, -indus)
-
-acc = list()
-AIC = list()
-
-for (i in 1:100)
-{
-  q <- EHModel_Regression_Logistic(dfx, "target")
-  acc[i]=q[2]
-  AIC[i]=q[3]
-}
-
-```
-```{r}
-accv <- unlist(acc)
-aveq <- mean(accv)
-
-aicv <- unlist(AIC)
-aicq <- mean(aicv)
-
-print(paste("Accuracy: ", aveq))
-print(paste("AIC: ", aicq))
-
-
-```
-
-The base model alone is an excellent predictor of crime rate. Accuracy is 91%. AIC of the smaller model is 171 (AIC will drop with fewer observations.)
-
-__*The final results for this model, averaging 100 rounds on an 80/20 split are 91% accuracy and an AIC of 215 for the full model.*__
-
-#### B. Enhanced Model with Dummies and Transformations
-
-Now we try a model with all of our dummy variables from above and as well as our interactions:
+Below is the result of a Random Forest analysis of pupil-student ratio using ten fold cross validation:
 
 ```{r}
 
-dfInt2 <- dfInt %>%
-  mutate(rmSquared = rm^2,nox_log = log(nox), age_log = log(age),dis_log = log(dis),lstat_log = log(lstat))
+df2 <- df1 %>%
+  dplyr:: select(-tax)
 
-dfEval <- dfEval %>%
-  mutate(rmSquared = rm^2,nox_log = log(nox), age_log = log(age),dis_log = log(dis),lstat_log = log(lstat))
-  
+b <- EHModel_RandomForest(df2, "ptratio", categorical=FALSE, seed=3456, printVarimp=FALSE, printPlot=FALSE)
+
 ```
 
-```{r include=FALSE}
-
-z <- EHModel_Regression_Logistic(dfInt2, "target", splitRatio = 1 )
-```
-
-Despite the larger number of variables, many of which are not significant, our AIC improves substantially to 178.  Through backward elimination we remove a number of variables and reduce the AIC to 163.  The new model can be seen below. Despite the fact that the tax variable does not seem significant, we leave it in, as taking it out increases AIC substantially.
+The analysis chooses the model with the lowest RMSE. We can see that the lowest RMSE was .88 at an  mtry of 6.  The plot below shows how mtry was minimized at 6 and began to climb thereafter.  Interestingly, when the model was applied to the evaluation set, the RMSE was lower at .75.  Assuming that the errors are normally distributed, an RMSE of .75 suggests our predictions  will be within 1.5 of the actual value 95% of the time.  Since the range for ptratio is 12.6 to 22 and the mean is 18.4, this is quite reasonable.
 
 ```{r}
 
-dfInt5 <- dfInt2 %>%
-  dplyr::select(-NoxOverPoint8, -nox, -radOver10, -ZnOver0, -lstat_log, -lstat, -zn, -indus, -MedvBelow50, -chas, -medv)
-
-dfEval <- dfEval %>%
-    dplyr::select(-NoxOverPoint8, -nox, -radOver10, -ZnOver0, -lstat_log, -lstat, -zn, -indus, -MedvBelow50, -chas, -medv)
-
-EHModel_Regression_Logistic(dfInt5, "target", splitRatio = 1)
+plot(b)
 
 ```
 
 
-We split the dataset 80/20 and perform 100 training iterations to test model predictive power.
-
-```{r include=FALSE}
-acc = list()
-AIC = list()
-
-for (i in 1:100)
-{
-  q <- EHModel_Regression_Logistic(dfInt5, "target")
-  acc[i]=q[2]
-  AIC[i]=q[3]
-}
-
-```
-```{r}
-accv <- unlist(acc)
-aveq <- mean(accv)
-
-aicv <- unlist(AIC)
-aicq <- mean(aicv)
-
-print(paste("Accuracy: ", aveq))
-print(paste("AIC: ", aicq))
-
-
-```
-
-
-The model does a better job predicting outcomes (accuracy = .94) than the base model, and the AIC for the smaller model falls from 171 to 134. 
-
-__*The final results for this model, averaging 100 rounds on an 80/20 split are 94% accuracy and an AIC of 163 for the full model.*__
-
-#### C. Enhanced Model with Interaction Terms
-
-For this model we add interaction terms in addition to dummies and transformations.  We choose the following interactions as they seem the most promising:
-
-inter_z_rm = ZnOver0$*$rm\
-inter_age_indus = IndusOver16$*$age\
-inter_rad_lstat = radOver10$*$lstat\
-inter_pt_rad = ptOver14$*$rad
+Below we see the variable importance table. Levels of industrialization and air quality are the two most important factors determining the predicted ptratio.  In general, indications of poverty – pollution, factories, low housing prices – all appear to influence the ptratio.  However, for the purposes of our prediction algorithm, it may not matter what  influences the ptratio, as long as we can predict it.
 
 ```{r}
 
-dfInt6 <- dfInt2 %>%
-  mutate(inter_z_rm = ZnOver0*rm) %>%
-  mutate(inter_age_indus = IndusOver16*age) %>%
-  mutate(inter_rad_lstat = radOver10*lstat) %>% 
-  mutate(inter_pt_rad = ptOver14*rad) 
+varImp(b)
 
 ```
+ 
+
+#### The Case for Decision Trees
+
+Sometimes when we leave our house in the morning it’s foggy and gray, and so we take our umbrella just in case.  We could run a random forest algorithm over all of the relevant variables and improve our prediction of whether it is going to rain, but this normally wouldn’t be appropriate for this situation. 
+
+Likewise, imagine that in addition to working for the Department of Education, you also volunteer in support of a nonprofit tutoring program.  The program wants to strategically offer tutoring services in suburbs where pupil-teacher ratios are high.  Since pupil-teacher ratios are not readily available, they ask you for a simple rule-of-thumb to predict them based on information that is readily available, like the age of owner-occupied units, housing prices and pollution levels.  They wouldn’t have the resources to implement a random forest algorithm, and really don’t need to – they just need to make some good, educated guesses about where best to deploy their staff.
+
+Assuming the data in this dataset is generalizable, you can offer such rules easily with a decision tree. Consider the decision tree below, which looks at  pupil-teacher ratio against the other variables in the dataset:
 
 ```{r}
 
-EHModel_Regression_Logistic(dfInt6, "target", splitRatio = 1)
-
-```
-None of the interaction terms are significant. AIC for the larger model climbs to 185, and the for the smaller it rises as well. Accuracy falls below 93%.  We will therefore reject the use of interaction terms.
-
-
-```{r include=FALSE}
-acc = list()
-AIC = list()
-
-for (i in 1:100)
-{
-  q <- EHModel_Regression_Logistic(dfInt6, "target")
-  acc[i]=q[2]
-  AIC[i]=q[3]
-}
-
-```
-```{r}
-accv <- unlist(acc)
-aveq <- mean(accv)
-
-aicv <- unlist(AIC)
-aicq <- mean(aicv)
-
-print(paste("Accuracy: ", aveq))
-print(paste("AIC: ", aicq))
-
+a <- EHModel_DecisionTree(df2, "ptratio", levels = 3, categorical=FALSE, seed=18227, printFancyTreeOnly=TRUE)
 
 ```
 
 
-### 4. Select Model
+This decision tree tells us that median home price is a reliable indicator of the pupil-teacher ratio. Moreover, it tells us where  the split is ($22,000).  After that, we can use air-quality and number of rooms per house to  better determine where tutors might be needed.   This tree can become a handy rubric for helping the nonprofit determine where to put its resources when certain information isn’t available.
 
-We choose model B as the model with both best accuracy and lowest AIC. First we run some diagnostics on the model.
+If the decision tree is likely to overfit the data, how do we know this particular tree is appropriate?  First, the tree had an RMSE of 1.5.  The mean pupil-teacher ratio is 18.4.  While some predictions will be incorrect, the majority of the time the rubric will do a perfectly good job of at least distinguishing between high pupil-teacher ratios and lower ones.
+
+Second, the VIF factors for the random forest result also report median home price, pollution levels and average number of rooms as important factors in determining pupil-teacher ratios (see above).  However, they are in a different order and include other factors as well.   It is possible if we removed more of the multicollinear variables we would have more consistency between individual decision trees and the random forest analysis.
+
+Now we are given a second request. Tutors deployed to areas in need may not necessarily want to live in those areas, as the areas are likely to be economically disadvantaged with few services. How might they be directed to suburbs with home prices that meet their modest tutor budget but are not in the most impoverished areas?
+
+The decision tree below suggests a simple rubric based primarily on the average number of rooms in the house – suburbs  where houses  tend to have more rooms are going  to have a more expensive housing stock. While this makes intuitive sense without needing a decision tree analysis, it is handy to have a simple formula – the neighborhoods that are affordable have less than seven rooms per house, and the neighborhoods that are not in the most impoverished areas have a lower status index less than 14. These are the neighborhoods for the tutors to begin their search.
 
 ```{r}
 
-  m1 <- glm(target ~ .,
-                        data = dfInt5,
-                        family = "binomial")
-  print(m1)
-  plot(m1)
-  mmps(m1)
-```
-
-Observations 338 and 280 appear to be outliers and possibly influential points (especially 280).  Since they are only two points, we will eliminate them to see their impact on accuracy and AIC:
-
-
-```{r include=FALSE}
-
-
-dfInt9 <- dfInt5 %>%
-  dplyr::filter(rownames(dfInt5) !="338" & rownames(dfInt5) !="280")
-
-acc = list()
-AIC = list()
-
-for (i in 1:100)
-{
-  q <- EHModel_Regression_Logistic(dfInt9, "target")
-  acc[i]=q[2]
-  AIC[i]=q[3]
-}
-
-```
-```{r}
-accv <- unlist(acc)
-aveq <- mean(accv)
-
-aicv <- unlist(AIC)
-aicq <- mean(aicv)
-
-print(paste("Accuracy: ", aveq))
-print(paste("AIC: ", aicq))
-
+a <- EHModel_DecisionTree(df2, "medv", levels = 3, categorical=FALSE, seed=18227, printFancyTreeOnly=TRUE)
 
 ```
 
-This improves both accuracy and AIC and so (with the risk of overfitting) we accept the change.
+In this case, the VIF factors agree with the decision tree. The RMSE is 6.0.  Because medv has a mean of 22 and ranges from 5 to 50, this rubric might be thought of more as a rule of thumb – it is a good starting place to avoid the most expensive and most impoverished  suburbs.
 
-Our final model is as follows. Results may differ since there as an 80/20 split - however, what is shown below is typical.
+#### Conclusion
 
-```{r}
-
-EHModel_Regression_Logistic(dfInt9, "target", xseed = 31)
-
-```
-
-The final step is to make predictions on the evaluation set:
-
-```{r}
-
-makePredictions <- function(m)
-{
-predictions <- as.data.frame(predict(m,newdata=dfEval, type="response"))
-write_csv(predictions, "D:\\RStudio\\CUNY_621\\predictionsCrime.csv")
-}
-
-a <- makePredictions(m1)
-
-head(a)
-
-```
-### 5. Conclusion
-
-We examined 466 records of town statistics to create a predictive model of whether crime rates were above the median or not. We used a logistic regression to do this, testing our models on an 80/20 split 100 times and taking the average accuracy and AIC.
-
-Several enhancements to the model increased accuracy and lowered AIC.  First, some predictors were transformed with the log or square to improve fit. Second, dummy variables were introduced to capture the fact that highly industrial areas appeared to operate by a different logic than mixed use areas.  interaction terms to model this phenomenon did not improve the model.  The final model was 94% accurate on the holdout set.
+In short, random forest and decision tree algorithms both have their uses. Always reflexively choosing an algorithm because it predicts best is akin to always choosing a Ferrari over a rickety school bus because it goes faster. It’s fine until you have to  transport 150 11-year-olds to the local zoo.  Algorithms don’t stand on their own but are used to solve problems, and the nature of the solution needs to match the nature of the problem.
 
