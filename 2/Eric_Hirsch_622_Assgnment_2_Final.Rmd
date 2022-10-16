@@ -15,7 +15,7 @@ knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 
 ```{r}
 library(tidyverse)
-devtools::install_github("ericonsi/EHData")
+#devtools::install_github("ericonsi/EHData")
 library(EHData)
 library(patchwork)
 library(gridExtra)
@@ -35,12 +35,29 @@ df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\CrimeRate.csv")
 
 #### Introduction\
 \
-
 Random Forest and Decision Trees are both non-parametric machine learning algorithms for predicting target variables from a set of independent variables. They may be used for classification or regression.  Decision trees work by splitting a source set into subsets, which may be further split depending on the data.  Random Forest is an ensemble learning algorithm which constructs a multitude of trees and takes the majority (in classification) or average (in regression) to make its prediction. By pooling the information from multiple trees, Random Forests compensate for the tendency of Decision Trees to overfit the data.  For this reason, Random Forests generally significantly outperform single trees in terms of prediction.
 
 However, the evaluation of algorithm performance can only be made in the context of a use case. For many use cases, particularly those where time and other resources are scarce and/or interpretability is more important, Decision Trees will be the better choice. We illustrate this with a dataset of data related to suburbs in the Boston area.
 
-The data set consists of 466 observations with 11 numeric variables and two binary variables. There are no missing values. The variables include the level of industrialization, average tax rates, pollution levels, and so on. This data set is often used to predict crime rates, but we won’t use it for that purpose. A summary appears below:
+The data set consists of 466 observations with 11 numeric variables and two binary variables. There are no missing values. The variables include the level of industrialization, average tax rates, pollution levels, and so on. This data set is often used to predict crime rates, but we won’t use it for that purpose. 
+
+These are the variables:
+
+•	zn: proportion of residential land zoned for large lots (over 25000 square feet)\
+•	indus: proportion of non-retail business acres per suburb\
+•	chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0)\
+•	nox: nitrogen oxides concentration (parts per 10 million)\
+•	rm: average number of rooms per dwelling\
+•	age: proportion of owner-occupied units built prior to 1940\
+•	dis: weighted mean of distances to five Boston employment centers\
+•	rad: index of accessibility to radial highways\
+•	tax: full-value property-tax rate per $10,000\
+•	ptratio: pupil-teacher ratio by town\
+•	lstat: lower status of the population (percent)\
+•	medv: median value of owner-occupied homes in $1000s\
+•	crime: whether the crime rate is above the median crime rate (1) or not (0)
+
+A summary appears below:
 
 ```{r}
 
@@ -48,7 +65,7 @@ summary(df1)
 
 ```
 
-When we examine histograms we see that a number of variables have distributions that are broken and uneven (zn, indus, nox and rad), suggesting possible hidden groupings. This may lend itself well to decision tree/random forest algorithms.  Many of the distributions are also skewed.
+When we examine histograms we see that a number of variables have distributions that are broken and uneven (zn, indus, nox and rad), suggesting possible hidden groupings. This may lend itself well to decision tree/random forest algorithms.  Many of the distributions are also skewed and we can see some likely outliers.  However, tree models are robust to outliers so we don't do transformations here.
  
 ```{r}
 
@@ -102,7 +119,7 @@ The analysis chooses the model with the lowest RMSE. We can see that the lowest 
 
 ```{r}
 
-plot(b)
+plot(b$rf)
 
 ```
 
@@ -111,10 +128,10 @@ Below we see the variable importance table. Levels of industrialization and air 
 
 ```{r}
 
-varImp(b)
+varImp(b$rf)
 
 ```
- 
+
 
 #### The Case for Decision Trees\
 \
@@ -123,7 +140,7 @@ Sometimes when we leave our house in the morning it’s foggy and gray, and so w
 
 Likewise, imagine that in addition to working for the Department of Education, you also volunteer in support of a nonprofit tutoring program.  The program wants to strategically offer tutoring services in suburbs where pupil-teacher ratios are high.  Since pupil-teacher ratios are not readily available, they ask you for a simple rule-of-thumb to predict them based on information that is readily available, like the age of owner-occupied units, housing prices and pollution levels.  They wouldn’t have the resources to implement a random forest algorithm, and really don’t need to – they just need to make some good, educated guesses about where best to deploy their staff.
 
-Assuming the data in this dataset is generalizable, you can offer such rules easily with a decision tree. Consider the decision tree below, which looks at  pupil-teacher ratio against the other variables in the dataset:
+Assuming the data in this dataset is generalizable, you can offer such rules easily with a decision tree. Consider the decision tree below, which looks at pupil-teacher ratio against the other variables in the dataset:
 
 ```{r}
 
@@ -131,16 +148,31 @@ a <- EHModel_DecisionTree(df2, "ptratio", levels = 3, categorical=FALSE, seed=18
 
 ```
 
-
 This decision tree tells us that median home price is a reliable indicator of the pupil-teacher ratio. Moreover, it tells us where  the split is ($22,000).  After that, we can use air-quality and number of rooms per house to  better determine where tutors might be needed.   This tree can become a handy rubric for helping the nonprofit determine where to put its resources when certain information isn’t available.
 
-If the decision tree is likely to overfit the data, how do we know this particular tree is appropriate?  First, the tree had an RMSE of 1.5.  The mean pupil-teacher ratio is 18.4.  While some predictions will be incorrect, the majority of the time the rubric will do a perfectly good job of at least distinguishing between high pupil-teacher ratios and lower ones.
+If the decision tree is likely to overfit the data, how do we know this particular tree is appropriate?  First, the tree had an RMSE of 1.5.  The mean pupil-teacher ratio is 18.4.  While some predictions will be incorrect, the majority of the time the rubric will do an adequate job of at least distinguishing between high pupil-teacher ratios and lower ones.
 
-Second, the VIF factors for the random forest result also report median home price, pollution levels and average number of rooms as important factors in determining pupil-teacher ratios (see above).  However, they are in a different order and include other factors as well.   It is possible if we removed more of the multicollinear variables we would have more consistency between individual decision trees and the random forest analysis.
+The distribution of residuals is shown below. We can see that errors can reach as high as 5 but the majority of errors are within 2.5:
 
-Now we are given a second request. Tutors deployed to areas in need may not necessarily want to live in those areas, as the areas are likely to be economically disadvantaged with few services. How might they be directed to suburbs with home prices that meet their modest tutor budget but are not in the most impoverished areas?
+```{r}
 
-The decision tree below suggests a simple rubric based primarily on the average number of rooms in the house – suburbs  where houses  tend to have more rooms are going  to have a more expensive housing stock. While this makes intuitive sense without needing a decision tree analysis, it is handy to have a simple formula – the neighborhoods that are affordable have less than seven rooms per house, and the neighborhoods that are not in the most impoverished areas have a lower status index less than 14. These are the neighborhoods for the tutors to begin their search.
+dfErrors <- a$errors
+q <- EH_Theme_Histogram()
+
+ggplot(dfErrors, aes(x=residuals)) +
+  ggtitle("Distribution of Residuals for Decision Tree") +
+  q$geom_histogram +
+  q$theme_histogram +
+  q$density_Histogram
+
+
+```
+
+Second, the VIF factors from the random forest model above also report median home price, pollution levels and average number of rooms as important factors in determining pupil-teacher ratios (see above).  However, they are in a different order and include other factors as well.   It is possible if we removed more of the multicollinear variables we would have more consistency between individual decision trees and the random forest analysis.
+
+Now we are given a second request. Tutors deployed to areas in need may not necessarily want to live in those areas, as the areas are likely to be economically disadvantaged with few services. Tutors are offered assistance in buying a house of up to $32,000. How might they be directed to towns with home prices that meet their modest budget but are not in the most impoverished areas?
+
+Of course, we can simply give the tutors a table of average home prices per town, but consider the following decision tree below. This suggests that towns where houses tend to have more rooms are going to have a more expensive housing stock. While this makes intuitive sense, it is very handy to have a simple formula.  Tutors who are comfortable with 7 rooms will easily find housing at the level they can afford. Those who need more should look for smaller houses in less affluent towns (but with an lstat over 14), while those who need less can afford smaller houses in the more expensive towns
 
 ```{r}
 
@@ -148,10 +180,10 @@ a <- EHModel_DecisionTree(df2, "medv", levels = 3, categorical=FALSE, seed=18227
 
 ```
 
-In this case, the VIF factors agree with the decision tree. The RMSE is 6.0.  Because medv has a mean of 22 and ranges from 5 to 50, this rubric might be thought of more as a rule of thumb – it is a good starting place to avoid the most expensive and most impoverished  suburbs.
+In this case, the VIF factors agree with the decision tree. The RMSE is 6.0.  Because medv has a mean of 22 and ranges from 5 to 50, this rubric might be thought of more as a rule of thumb – it is a good starting place to avoid towns where houses are too small or too expensive.
 
 #### Conclusion\
 \
 
-In short, random forest and decision tree algorithms both have their uses. Always reflexively choosing an algorithm because it predicts best is akin to always choosing a Ferrari over a rickety school bus because it goes faster. It’s fine until you have to  transport 150 11-year-olds to the local zoo.  Algorithms don’t stand on their own but are used to solve problems, and the nature of the solution needs to match the nature of the problem.
+In short, random forest and decision tree algorithms both have their uses. Always reflexively choosing an algorithm because it predicts best is akin to always choosing a Ferrari over a rickety school bus because it goes faster. It’s fine until you have to transport 150 crying 6-year-olds to the local zoo.  Algorithms don’t stand on their own but are used to solve problems, and the nature of the solution needs to match the nature of the problem.
 
