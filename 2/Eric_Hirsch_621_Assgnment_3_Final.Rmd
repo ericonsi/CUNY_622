@@ -33,7 +33,8 @@ df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\CrimeRate.csv")
 ```
 
 
-#### Introduction
+#### Introduction\
+\
 
 Random Forest and Decision Trees are both non-parametric machine learning algorithms for predicting target variables from a set of independent variables. They may be used for classification or regression.  Decision trees work by splitting a source set into subsets, which may be further split depending on the data.  Random Forest is an ensemble learning algorithm which constructs a multitude of trees and takes the majority (in classification) or average (in regression) to make its prediction. By pooling the information from multiple trees, Random Forests compensate for the tendency of Decision Trees to overfit the data.  For this reason, Random Forests generally significantly outperform single trees in terms of prediction.
 
@@ -66,7 +67,8 @@ a <- EHExplore_Multicollinearity(df1)
 
 ```
 
-#### When Random Forest Works Better
+#### When Random Forest Works Better\
+\
 
 The table below illustrates how much more effective random forests are than decision trees in making predictions.  Random forests and decision tree models were constructed for seven selected variables in dataset, predictions were made on an evaluation set, and RMSEs were calculated.  The random forest models were superior at predicting in every case.  The package used here is the CARET. 
 
@@ -114,7 +116,8 @@ varImp(b)
 ```
  
 
-#### The Case for Decision Trees
+#### The Case for Decision Trees\
+\
 
 Sometimes when we leave our house in the morning it’s foggy and gray, and so we take our umbrella just in case.  We could run a random forest algorithm over all of the relevant variables and improve our prediction of whether it is going to rain, but this normally wouldn’t be appropriate for this situation. 
 
@@ -147,7 +150,8 @@ a <- EHModel_DecisionTree(df2, "medv", levels = 3, categorical=FALSE, seed=18227
 
 In this case, the VIF factors agree with the decision tree. The RMSE is 6.0.  Because medv has a mean of 22 and ranges from 5 to 50, this rubric might be thought of more as a rule of thumb – it is a good starting place to avoid the most expensive and most impoverished  suburbs.
 
-#### Conclusion
+#### Conclusion\
+\
 
 In short, random forest and decision tree algorithms both have their uses. Always reflexively choosing an algorithm because it predicts best is akin to always choosing a Ferrari over a rickety school bus because it goes faster. It’s fine until you have to  transport 150 11-year-olds to the local zoo.  Algorithms don’t stand on their own but are used to solve problems, and the nature of the solution needs to match the nature of the problem.
 
