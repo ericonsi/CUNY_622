@@ -1,0 +1,383 @@
+---
+title: "Eric_Hirsch_621_Assignment_3"
+subtitle: "Predicting Town Crime Rates" 
+author: "Eric Hirsch"
+date: "4/7/2022"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+---
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+devtools::install_github("ericonsi/EHData")
+library(EHData)
+library(patchwork)
+library(gridExtra)
+library(ggsci)
+library(caret)
+library(pROC)
+library(car)
+
+```
+```{r}
+
+df <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
+dfEval <- read.csv("D:\\RStudio\\CUNY_621\\Assignment 3\\crime-training-data_modified.csv")
+
+```
+
+
+
+
+### 1. Data Exploration
+
+
+#### A. Summary Statistics
+
+We first examine the data. The dataset consists of 466 observations and 13 variables, all numeric.  Two are binary, including the target. There are no missing values.  The target appears to be relatively balanced (which makes sense, as it is an indicator of being above or below the median.)   
+
+```{r}
+
+summary(df)
+str(df)
+
+```
+
+```{r}
+library(psych)
+
+a <- EHSummarize_StandardPlots(df, "target", type="box")
+```
+
+Looking at boxplots, histograms, and boxplots against the target variable, we see some areas of interest.  A number of distributions are broken (e.g. zn, indus, nox and rad ), suggesting there may be hidden grouping within the variables.  For example, zn = 0 may include areas that are different in their makeup from zn>0.  In fact, there may be a common phenomenon among all of them which identifies certain areas as highly industrial with a different crime logic, as opposed to the mixed industrial and residential areas for the rest of the observations.  
+
+Most of the correlations are unsurprising, with the exception of tax rate, which increases with increase in crime.  Again, this may reflect some interaction, since residential and industrial areas may both be high tax areas, but residential areas may see more crime as they become industrial, whereas industrial areas may see less (as the # of residents approaches 0).
+
+#### B. Multicollinearity
+
+Mutlicollinearity is highly evident in the database - not surprisingly, given the discussion above.  The correlation between rad and tax is over 90%. We also see here the correlation between tax rate and level of industrialization (which is also correlated with high crime rates), which explains the counterintuitive result above. 
+
+```{r}
+EHExplore_Multicollinearity(df)
+
+
+```
+
+### 2. Data Preparation
+
+#### A. Interaction terms
+
+As stated before, the dataset appears to hold the potential for many interaction terms, as many distributions suggest areas of very low industrialization and very high industrialization, which may affect the slope of other variables.  We create some dummy variables and look for interactions.  These are the dummy variables we've chosen, based on the histograms above:
+
+    TaxOver600
+    radOver10
+    ptOver14
+    lstatOver12
+    IndusOver16
+    ZnOver0
+    NoxOverPoint8
+    MedvBelow50
+
+The following are just some of the possible interactions we discover affecting the dataset:
+
+```{r}
+
+dfInt <- df %>%
+    mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
+    mutate(radOver10 = ifelse(rad>=10,1,0)) %>%
+    mutate(ptOver14 = as.numeric(ifelse(ptratio>=14,1,0))) %>%
+    mutate(lstatOver12 = ifelse(lstat>=12,1,0)) %>%
+    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
+    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
+    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
+    mutate(MedvBelow50 = ifelse(medv<50,1,0))
+
+dfEval <- dfEval %>%
+    mutate(TaxOver600 = ifelse(tax>=600,1,0)) %>%
+    mutate(radOver10 = ifelse(rad>=10,1,0)) %>%
+    mutate(ptOver14 = as.numeric(ifelse(ptratio>=14,1,0))) %>%
+    mutate(lstatOver12 = ifelse(lstat>=12,1,0)) %>%
+    mutate(IndusOver16 = ifelse(indus>=16,1,0)) %>%
+    mutate(ZnOver0 = ifelse(zn>0,1,0)) %>%
+    mutate(NoxOverPoint8 = ifelse(nox>=.8,1,0)) %>%
+    mutate(MedvBelow50 = ifelse(medv<50,1,0))
+
+a <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ZnOver0")
+b <- EHExplore_Interactions_Scatterplots(dfInt, "target", "IndusOver16")
+c <- EHExplore_Interactions_Scatterplots(dfInt, "target", "radOver10")
+d <- EHExplore_Interactions_Scatterplots(dfInt, "target", "TaxOver600")
+e <- EHExplore_Interactions_Scatterplots(dfInt, "target", "ptOver14")
+
+x <- c(a[2], a[5], a[9], b[4], b[6], c[11], d[10], e[8], e[2], e[9])
+
+grid.arrange(grobs=x, ncol=3, nrow=4)
+
+```
+
+From these plots, we might draw a number of conclusions.  First, in the most highly industrialized areas the crime rate appears to be high no matter the other factors. Zone 0 areas behave differently from zone 1 areas. In the few schools where the pt ratio is very small, crime rates are high, even though in general crime rates increase as ptratio increases.  There may be other conclusions we can draw as well.
+
+These interactions may or may not prove useful.  We don't want to overfit the data, so it may be enough to simply include the dummy variables.
+
+#### B. Transformations
+
+When the predictor variable is normally distributed but with different variance for the two values of y, we may try a quadratic function of x.  rm may be considered a reasonable candidate for this.
+
+For skewed distributions, we may include both x and log(x).  nox, age, dis and lstat may be candidates for this. 
+
+Therefore we add the following transformations:
+
+rmSquared, nox_log, age_log, dis_log, lstat_log
+
+
+### 3. Build Models
+
+#### A. Base Model
+
+We begin with the base model (all original variables from the original dataset).  
+
+
+```{r}
+EHModel_Regression_Logistic(df, "target", splitRatio = 1)
+
+```
+
+In the base model, only 4 of the 12 predictors are not significant. AIC is 218. Through backward elimination we remove rm, lstat, chas and indus and arrive at a model with an AIC of 215.
+
+Now we split the dataset 80/20 and perform 100 training iterations to test model predictive power.  
+
+```{r include=FALSE}
+
+dfx <- df %>%
+  dplyr::select(-rm, -lstat, -chas, -indus)
+
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfx, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(paste("Accuracy: ", aveq))
+print(paste("AIC: ", aicq))
+
+
+```
+
+The base model alone is an excellent predictor of crime rate. Accuracy is 91%. AIC of the smaller model is 171 (AIC will drop with fewer observations.)
+
+__*The final results for this model, averaging 100 rounds on an 80/20 split are 91% accuracy and an AIC of 215 for the full model.*__
+
+#### B. Enhanced Model with Dummies and Transformations
+
+Now we try a model with all of our dummy variables from above and as well as our interactions:
+
+```{r}
+
+dfInt2 <- dfInt %>%
+  mutate(rmSquared = rm^2,nox_log = log(nox), age_log = log(age),dis_log = log(dis),lstat_log = log(lstat))
+
+dfEval <- dfEval %>%
+  mutate(rmSquared = rm^2,nox_log = log(nox), age_log = log(age),dis_log = log(dis),lstat_log = log(lstat))
+  
+```
+
+```{r include=FALSE}
+
+z <- EHModel_Regression_Logistic(dfInt2, "target", splitRatio = 1 )
+```
+
+Despite the larger number of variables, many of which are not significant, our AIC improves substantially to 178.  Through backward elimination we remove a number of variables and reduce the AIC to 163.  The new model can be seen below. Despite the fact that the tax variable does not seem significant, we leave it in, as taking it out increases AIC substantially.
+
+```{r}
+
+dfInt5 <- dfInt2 %>%
+  dplyr::select(-NoxOverPoint8, -nox, -radOver10, -ZnOver0, -lstat_log, -lstat, -zn, -indus, -MedvBelow50, -chas, -medv)
+
+dfEval <- dfEval %>%
+    dplyr::select(-NoxOverPoint8, -nox, -radOver10, -ZnOver0, -lstat_log, -lstat, -zn, -indus, -MedvBelow50, -chas, -medv)
+
+EHModel_Regression_Logistic(dfInt5, "target", splitRatio = 1)
+
+```
+
+
+We split the dataset 80/20 and perform 100 training iterations to test model predictive power.
+
+```{r include=FALSE}
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfInt5, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(paste("Accuracy: ", aveq))
+print(paste("AIC: ", aicq))
+
+
+```
+
+
+The model does a better job predicting outcomes (accuracy = .94) than the base model, and the AIC for the smaller model falls from 171 to 134. 
+
+__*The final results for this model, averaging 100 rounds on an 80/20 split are 94% accuracy and an AIC of 163 for the full model.*__
+
+#### C. Enhanced Model with Interaction Terms
+
+For this model we add interaction terms in addition to dummies and transformations.  We choose the following interactions as they seem the most promising:
+
+inter_z_rm = ZnOver0$*$rm\
+inter_age_indus = IndusOver16$*$age\
+inter_rad_lstat = radOver10$*$lstat\
+inter_pt_rad = ptOver14$*$rad
+
+```{r}
+
+dfInt6 <- dfInt2 %>%
+  mutate(inter_z_rm = ZnOver0*rm) %>%
+  mutate(inter_age_indus = IndusOver16*age) %>%
+  mutate(inter_rad_lstat = radOver10*lstat) %>% 
+  mutate(inter_pt_rad = ptOver14*rad) 
+
+```
+
+```{r}
+
+EHModel_Regression_Logistic(dfInt6, "target", splitRatio = 1)
+
+```
+None of the interaction terms are significant. AIC for the larger model climbs to 185, and the for the smaller it rises as well. Accuracy falls below 93%.  We will therefore reject the use of interaction terms.
+
+
+```{r include=FALSE}
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfInt6, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(paste("Accuracy: ", aveq))
+print(paste("AIC: ", aicq))
+
+
+```
+
+
+### 4. Select Model
+
+We choose model B as the model with both best accuracy and lowest AIC. First we run some diagnostics on the model.
+
+```{r}
+
+  m1 <- glm(target ~ .,
+                        data = dfInt5,
+                        family = "binomial")
+  print(m1)
+  plot(m1)
+  mmps(m1)
+```
+
+Observations 338 and 280 appear to be outliers and possibly influential points (especially 280).  Since they are only two points, we will eliminate them to see their impact on accuracy and AIC:
+
+
+```{r include=FALSE}
+
+
+dfInt9 <- dfInt5 %>%
+  dplyr::filter(rownames(dfInt5) !="338" & rownames(dfInt5) !="280")
+
+acc = list()
+AIC = list()
+
+for (i in 1:100)
+{
+  q <- EHModel_Regression_Logistic(dfInt9, "target")
+  acc[i]=q[2]
+  AIC[i]=q[3]
+}
+
+```
+```{r}
+accv <- unlist(acc)
+aveq <- mean(accv)
+
+aicv <- unlist(AIC)
+aicq <- mean(aicv)
+
+print(paste("Accuracy: ", aveq))
+print(paste("AIC: ", aicq))
+
+
+```
+
+This improves both accuracy and AIC and so (with the risk of overfitting) we accept the change.
+
+Our final model is as follows. Results may differ since there as an 80/20 split - however, what is shown below is typical.
+
+```{r}
+
+EHModel_Regression_Logistic(dfInt9, "target", xseed = 31)
+
+```
+
+The final step is to make predictions on the evaluation set:
+
+```{r}
+
+makePredictions <- function(m)
+{
+predictions <- as.data.frame(predict(m,newdata=dfEval, type="response"))
+write_csv(predictions, "D:\\RStudio\\CUNY_621\\predictionsCrime.csv")
+}
+
+a <- makePredictions(m1)
+
+head(a)
+
+```
+### 5. Conclusion
+
+We examined 466 records of town statistics to create a predictive model of whether crime rates were above the median or not. We used a logistic regression to do this, testing our models on an 80/20 split 100 times and taking the average accuracy and AIC.
+
+Several enhancements to the model increased accuracy and lowered AIC.  First, some predictors were transformed with the log or square to improve fit. Second, dummy variables were introduced to capture the fact that highly industrial areas appeared to operate by a different logic than mixed use areas.  interaction terms to model this phenomenon did not improve the model.  The final model was 94% accurate on the holdout set.
+

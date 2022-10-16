@@ -44,10 +44,185 @@ library(EHData)
 df1 <- read.csv("D:\\RStudio\\CUNY_622\\2\\CrimeRate.csv")
 
 summary(df1)
+df2 <- df1 %>%
+  dplyr:: select(-tax)
 
-a <- EHModel_DecisionTree(df1, "rad", levels = 4, categorical=FALSE, seed=147)
-b <- EHModel_RandomForest(df1, "rad", categorical=FALSE, seed = 356)
+#a <- EHModel_DecisionTree(df2, "ptratio", levels = 3, categorical=FALSE, seed=18227)
+b <- EHModel_RandomForest(df2, "ptratio", categorical=FALSE, seed = 3456)
+```
+```{r}
+
+target="ptratio"
+categorical=FALSE
+seed=3456
+
+df4 <- df2
+
+ targ123 <- target
+
+  if (categorical) {
+    df4[, targ123] <- as.factor(df4[, targ123])
+  } 
+  
+  set.seed(seed)
+  
+  i <- createDataPartition(df4[,targ123], p=0.8, list=FALSE)
+  
+  dfEval <- df4[-i,]
+  dfTrain <- df4[i,]
+  
+  count(dfTrain[targ123])
+  
+  tc <- trainControl(method="cv", number=10)
+  metric <- "Accuracy"
+  
+  
+  Formula  = reformulate(".",response=targ123)
+ # rf <- train(Formula, data=dfTrain, method="rf", trControl = tc)
+  #rf
+  
+  set.seed(1234)
+  
+tuneGrid <- expand.grid(.mtry = c(1: 10))
+rf_mtry <- train(ptratio~.,
+data = dfTrain,
+method = "rf",
+tuneGrid = tuneGrid,
+trControl = tc,
+importance = TRUE,
+nodesize = 14,
+ntree = 300)
+print(rf_mtry)
+
+best_mtry <- rf_mtry$bestTune$mtry
+best_mtry
+
+store_maxnode <- list()
+tuneGrid <- expand.grid(.mtry = best_mtry)
+for (maxnodes in c(15: 25)) {
+set.seed(1234)
+rf_maxnode <- train(ptratio~.,
+data = dfTrain,
+method = "rf",
+tuneGrid = tuneGrid,
+trControl = tc,
+importance = TRUE,
+nodesize = 14,
+maxnodes = maxnodes,
+ntree = 300)
+current_iteration <- toString(maxnodes)
+store_maxnode[[current_iteration]] <- rf_maxnode
+}
+results_mtry <- resamples(store_maxnode)
+summary(results_mtry)
+
+store_maxtrees <- list()
+for (ntree in c(2000, 2500, 3000, 3500)) {
+set.seed(5678)
+rf_maxtrees <- train(ptratio~.,
+data = dfTrain,
+method = "rf",
+tuneGrid = tuneGrid,
+trControl = tc,
+importance = TRUE,
+nodesize = 14,
+maxnodes = 24,
+ntree = ntree)
+key <- toString(ntree)
+store_maxtrees[[key]] <- rf_maxtrees
+}
+results_tree <- resamples(store_maxtrees)
+summary(results_tree)
+  
+  print(rf)
+  print(plot(rf))
+  print(varImp(rf))
+  
+  rf <- train(ptratio~.,
+dfTrain,
+method = "rf",
+tuneGrid = tuneGrid,
+trControl = tc,
+importance = TRUE,
+nodesize = 14,
+ntree = 2000,
+maxnodes = 50)
+   
+  
+  
+  if (categorical) {
+    x <- factor(dfEval[, targ123])
+    y <- confusionMatrix(predictions, x) 
+    print(y)
+  } else {
+    
+    library(Metrics)
+    rmseval <- rmse(dfEval[,targ123], dfPred$predictions)
+    print(paste('Random Forest - RMSE on evaluation set: ', rmseval))
+  }
+
+```
+
+```{r}
+
+set.seed(3456)
+
+# library(doParallel)
+# cores <- 7
+# registerDoParallel(cores = cores)
+#mtry: Number of random variables collected at each split. In normal equal square number columns.
+mtry <- sqrt(ncol(dfTrain))
+#ntree: Number of trees to grow.
+ntree <- 3
+
+
+control <- trainControl(method='repeatedcv', 
+                        number=10, 
+                        repeats=3,
+                        search = 'random')
+
+#Random generate 15 mtry values with tuneLength = 15
+set.seed(1)
+rf_random <- train(ptratio ~ .,
+                   data = dfTrain,
+                   method = 'rf',
+                   tuneLength  = 15, 
+                   trControl = control)
+print(rf_random)
+```
+
+```{r}
+
+repGrid <- expand.grid(.mtry=c(6)) 
+ rf2 <- train(ptratio~.,
+dfTrain,
+method = "rf",
+tuneGrid = repGrid,
+trControl = tc,
+importance = TRUE,
+nodesize = 14,
+ntree = 300,
+maxnodes = 22)
+ 
+ rf2
+   print(rf2)
+  print(varImp(rf2))
+   
+  predictions <- predict(rf2, dfEval)
+  dfPred <- as.data.frame(predictions)
+  
+  if (categorical) {
+    x <- factor(dfEval$ptratio)
+    y <- confusionMatrix(predictions, x) 
+    print(y)
+  } else {
+    
+    library(Metrics)
+    rmseval <- rmse(dfEval$ptratio, dfPred$predictions)
+    print(paste('Random Forest - RMSE on evaluation set: ', rmseval))
+  }
 
 
 ```
+
 
