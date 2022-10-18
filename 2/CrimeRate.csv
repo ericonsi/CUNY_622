@@ -1,4 +1,4 @@
-zn,indus,chas,nox,rm,age,dis,rad,tax,ptratio,lstat,medv,target
+zn,indus,chas,nox,rm,age,dis,rad,tax,ptratio,lstat,medv,crimerate
 0,19.58,0,0.605,7.929,96.2,2.0459,5,403,14.7,3.7,50,1
 0,19.58,1,0.871,5.403,100,1.3216,5,403,14.7,26.82,13.4,1
 0,18.1,0,0.74,6.485,100,1.9784,24,666,20.2,18.85,15.4,1
