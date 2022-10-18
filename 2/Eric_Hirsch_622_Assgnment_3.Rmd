@@ -122,6 +122,7 @@ df3 <- df2 %>%
 
 #devtools::install_github("ericonsi/EHData")
 #library(EHData)
+c <- EHModel_DecisionTree(df3, "highPT")
 c <- EHModel_SVM(df3, "highPT", method="radial", printPlot=FALSE)
 d <- EHModel_RandomForest(df3, "highPT", categorical=TRUE)
 e <- EHModel_Regression_Logistic(df3, "highPT")
