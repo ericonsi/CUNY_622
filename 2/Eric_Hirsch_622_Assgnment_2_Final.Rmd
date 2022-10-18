@@ -87,7 +87,7 @@ a <- EHExplore_Multicollinearity(df1)
 #### When Random Forest Works Better\
 \
 
-The table below illustrates how much more effective random forests are than decision trees in making predictions. The table displays RMSEs for predictions on an evaluation set for Decision Tree and Random Forest Random for seven selected variables in the dataset.  The random forest models were superior at predicting in every case.  (The package used here is CARET in r.) 
+The table below illustrates how much more effective random forests are than decision trees in making predictions. The table displays RMSEs for predictions on an evaluation set for Decision Tree and Random Forest for seven selected variables in the dataset.  The random forest models were superior at predicting in every case.  (The package used here is CARET in r.) 
 
 ```{r}
 
@@ -192,7 +192,7 @@ Second, the VIF factors from the random forest model above also report median ho
 
 Now we are given a second request. Tutors deployed to areas in need may not necessarily want to live in those areas, as the areas are likely to be economically disadvantaged with few services. Tutors are offered assistance in buying a house of up to $32,000. How might they be directed to towns with home prices that meet their modest budget but are not in the most impoverished areas?
 
-Of course, we can simply give the tutors a table of average home prices per town, but consider the usefulness of combining that information with the decision tree below, which examines median home prices gaianst the other variables in the dataset. The tree suggests that towns where houses tend to have more rooms are going to have a more expensive housing stock. While this is common sense, it is very handy to have a simple formula.  Tutors who are comfortable with 7 room houses will easily find housing at the level they can afford. Those who need more should look for smaller houses in less affluent towns (but with a lower status index (lstat) over 14), while those who need less can afford smaller houses in the more expensive towns.
+Of course, we can simply give the tutors a table of average home prices per town, but consider the usefulness of combining that information with the decision tree below, which examines median home prices against the other variables in the dataset. The tree suggests that towns where houses tend to have more rooms are going to have a more expensive housing stock. While this is common sense, it is very handy to have a simple formula.  Tutors who are comfortable with 7 room houses will easily find housing at the level they can afford. Those who need more should look for smaller houses in less affluent towns (but with a lower status index (lstat) over 14), while those who need less can afford smaller houses in the more expensive towns.
 
 ```{r}
 
