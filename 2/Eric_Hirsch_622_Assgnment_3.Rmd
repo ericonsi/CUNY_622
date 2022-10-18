@@ -117,7 +117,7 @@ b <- EHModel_RandomForest(df2, "ptratio", categorical=FALSE, seed=3456, printVar
 ```{r}
 
 df3 <- df2 %>%
-  mutate(highPT = as.factor(ifelse(ptratio>18.4, 1, 0))) %>%
+  mutate(highPT = as.numeric(ifelse(ptratio>18.4, 1, 0))) %>%
   dplyr::select(highPT, nox, medv)
 
 ggplot(df3, aes(x=nox, y=medv, color=highPT)) +
@@ -126,7 +126,7 @@ ggplot(df3, aes(x=nox, y=medv, color=highPT)) +
 ```
 ```{r}
 
-#devtools::install_github("ericonsi/EHData")
+devtools::install_github("ericonsi/EHData")
 #library(EHData)
 q <- EHModel_DecisionTree(df3, "highPT", levels=4)
 c <- EHModel_SVM(df3, "highPT", method="linear", printPlot=FALSE)
@@ -134,6 +134,18 @@ d <- EHModel_RandomForest(df3, "highPT", categorical=TRUE, printPlot=FALSE)
 e <- EHModel_Regression_Logistic(df3, "highPT")
 
 ```
+
+```{r}
+
+dfError <- c$errors %>%
+  mutate(highPT = as.factor(ifelse(ptratio>18.4, 1, 0))) %>%
+  dplyr::select(highPT, nox, medv)
+
+ggplot(df3, aes(x=nox, y=medv, color=highPT)) +
+  geom_point()
+
+```
+
 
 The analysis chooses the model with the lowest RMSE. We can see that the lowest RMSE was .88 at an  mtry of 6.  The plot below shows how mtry was minimized at 6 and began to climb thereafter.  
 ```{r fig.height =4,  fig.width=3}
