@@ -79,7 +79,7 @@ grid.arrange(grobs=a, ncol=3, nrow=5)
 There is also a great deal of multicollinearity. The highest correlation (over 90%) is between rad and tax.  We will drop the tax rate to avoid problems with interpretation later on. 
 
 ```{r}
-a <- EHExplore_Multicollinearity(df1)
+a <- EHExplore_Multicollinearity(df1, printCorrs = TRUE)
 
 
 ```
@@ -117,14 +117,20 @@ b <- EHModel_RandomForest(df2, "ptratio", categorical=FALSE, seed=3456, printVar
 ```{r}
 
 df3 <- df2 %>%
-  mutate(highPT = ifelse(ptratio>18.4, 1, 0)) %>%
-  dplyr::select(-ptratio)
+  mutate(highPT = as.factor(ifelse(ptratio>18.4, 1, 0))) %>%
+  dplyr::select(highPT, nox, medv)
+
+ggplot(df3, aes(x=nox, y=medv, color=highPT)) +
+  geom_point()
+
+```
+```{r}
 
 #devtools::install_github("ericonsi/EHData")
 #library(EHData)
-c <- EHModel_DecisionTree(df3, "highPT")
-c <- EHModel_SVM(df3, "highPT", method="radial", printPlot=FALSE)
-d <- EHModel_RandomForest(df3, "highPT", categorical=TRUE)
+q <- EHModel_DecisionTree(df3, "highPT", levels=4)
+c <- EHModel_SVM(df3, "highPT", method="linear", printPlot=FALSE)
+d <- EHModel_RandomForest(df3, "highPT", categorical=TRUE, printPlot=FALSE)
 e <- EHModel_Regression_Logistic(df3, "highPT")
 
 ```
