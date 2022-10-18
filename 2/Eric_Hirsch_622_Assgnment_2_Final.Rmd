@@ -87,7 +87,7 @@ a <- EHExplore_Multicollinearity(df1)
 #### When Random Forest Works Better\
 \
 
-The table below illustrates how much more effective random forests are than decision trees in making predictions.  Random forests and decision tree models were constructed for seven selected variables in dataset, predictions were made on an evaluation set, and RMSEs were calculated.  The random forest models were superior at predicting in every case.  The package used here is the CARET. 
+The table below illustrates how much more effective random forests are than decision trees in making predictions. The table displays RMSEs for predictions on an evaluation set for Decision Tree and Random Forest Random for seven selected variables in the dataset.  The random forest models were superior at predicting in every case.  (The package used here is CARET in r.) 
 
 ```{r}
 
@@ -100,7 +100,7 @@ tab
 ```
 
 
-Now imagine you are a data scientist working for the Department of Education tasked with predicting the pupil-student ratio in various suburbs where the information is not readily available. Hundreds of thousands of tax dollars to support underserved students depend on the calculation so you need to be as accurate as possible.  Your department has the time and resources to apply whatever model you create to any new data you receive.  Given the table above, random forest is the best choice as it outperforms a single decision tree when predicting ptratio (RMSE = 7.5 vs. RMSE = 1.5 for the decision tree).
+Now imagine you are a data scientist working for the Department of Education tasked with predicting the pupil-student ratio (ptratio) in various suburbs where the information is not readily available. Hundreds of thousands of tax dollars to support underserved students depend on the calculation so you need to be as accurate as possible.  Your department has the time and resources to apply whatever model you create to any new data you receive.  Given the table above, random forest is the best choice as it outperforms a single decision tree when predicting ptratio (RMSE = 7.5 vs. RMSE = 1.5 for the decision tree).
 
 When creating a random forest algorithm in R, there are a number of parameters we can tune. The most important of these are mtry (the number of variables drawn randomly for each split), ntree (the number of trees to grow) and maxnode (the maximum amount of terminal nodes in the forest).  While the caret package automatically optimizes parameters for random forest, the parameters can also be tuned manually. However, manual tuning of the parameters did not result in a lower RMSE in the evaluation set than out of the box tuning.
 
@@ -108,21 +108,40 @@ Below is the result of a Random Forest analysis of pupil-student ratio using ten
 
 ```{r}
 
+#devtools::install_github("ericonsi/EHData")
+#library(EHData)
+
 df2 <- df1 %>%
   dplyr:: select(-tax)
 
 b <- EHModel_RandomForest(df2, "ptratio", categorical=FALSE, seed=3456, printVarimp=FALSE, printPlot=FALSE)
 
+
 ```
 
-The analysis chooses the model with the lowest RMSE. We can see that the lowest RMSE was .88 at an  mtry of 6.  The plot below shows how mtry was minimized at 6 and began to climb thereafter.  Interestingly, when the model was applied to the evaluation set, the RMSE was lower at .75.  Assuming that the errors are normally distributed, an RMSE of .75 suggests our predictions  will be within 1.5 of the actual value 95% of the time.  Since the range for ptratio is 12.6 to 22 and the mean is 18.4, this is quite reasonable.
-
-```{r}
+The analysis chooses the model with the lowest RMSE. We can see that the lowest RMSE was .88 at an  mtry of 6.  The plot below shows how mtry was minimized at 6 and began to climb thereafter.  
+```{r fig.height =4,  fig.width=3}
 
 plot(b$rf)
 
 ```
 
+Interestingly, when the model was applied to the evaluation set, the RMSE was lower at .75.  Assuming that the errors are normally distributed, an RMSE of .75 suggests our predictions will be within about 1.5 of the actual value 95% of the time. Since the range for ptratio is 12.6 to 22 and the mean is 18.4, this is quite reasonable.  The histogram below shows the distribution of errors - with the exception of an outlier at -4 the errors are relatively normally distributed.
+
+
+```{r fig.height =4,  fig.width=6}
+
+dfErrors <- b$errors
+q <- EH_Theme_Histogram()
+
+ggplot(dfErrors, aes(x=residuals)) +
+  ggtitle("Distribution of Residuals for Random Forest") +
+  q$geom_histogram +
+  q$theme_histogram +
+  q$density_Histogram
+
+
+```
 
 Below we see the variable importance table. Levels of industrialization and air quality are the two most important factors determining the predicted ptratio.  In general, indications of poverty – pollution, factories, low housing prices – all appear to influence the ptratio.  However, for the purposes of our prediction algorithm, it may not matter what  influences the ptratio, as long as we can predict it.
 
@@ -138,7 +157,7 @@ varImp(b$rf)
 
 Sometimes when we leave our house in the morning it’s foggy and gray, and so we take our umbrella just in case.  We could run a random forest algorithm over all of the relevant variables and improve our prediction of whether it is going to rain, but this normally wouldn’t be appropriate for this situation. 
 
-Likewise, imagine that in addition to working for the Department of Education, you also volunteer in support of a nonprofit tutoring program.  The program wants to strategically offer tutoring services in suburbs where pupil-teacher ratios are high.  Since pupil-teacher ratios are not readily available, they ask you for a simple rule-of-thumb to predict them based on information that is readily available, like the age of owner-occupied units, housing prices and pollution levels.  They wouldn’t have the resources to implement a random forest algorithm, and really don’t need to – they just need to make some good, educated guesses about where best to deploy their staff.
+Likewise, imagine that in addition to working for the Department of Education, you also volunteer in support of a nonprofit tutoring program.  The program wants to strategically offer tutoring services in suburbs where pupil-teacher ratios are high.  Since pupil-teacher ratios are not readily available, they ask you for a simple rule-of-thumb to predict them based on information that is readily available, like the age of owner-occupied units, housing prices and pollution levels.  They wouldn’t have the resources to implement a random forest algorithm, and really don’t need to – they just need to make some good, educated guesses about where to best deploy their staff.
 
 Assuming the data in this dataset is generalizable, you can offer such rules easily with a decision tree. Consider the decision tree below, which looks at pupil-teacher ratio against the other variables in the dataset:
 
@@ -148,13 +167,14 @@ a <- EHModel_DecisionTree(df2, "ptratio", levels = 3, categorical=FALSE, seed=18
 
 ```
 
-This decision tree tells us that median home price is a reliable indicator of the pupil-teacher ratio. Moreover, it tells us where  the split is ($22,000).  After that, we can use air-quality and number of rooms per house to  better determine where tutors might be needed.   This tree can become a handy rubric for helping the nonprofit determine where to put its resources when certain information isn’t available.
+This decision tree tells us that median home price (medv) is a reliable predictor for the pupil-teacher ratio. Moreover, it tells us where  the split is ($22,000).  After that, we can use air-quality (nox) and average number of rooms per house (rm) to  better determine where tutors might be needed.   This tree can become a handy rubric for helping the nonprofit determine where to put its resources when certain information isn’t available.
 
 If the decision tree is likely to overfit the data, how do we know this particular tree is appropriate?  First, the tree had an RMSE of 1.5.  The mean pupil-teacher ratio is 18.4.  While some predictions will be incorrect, the majority of the time the rubric will do an adequate job of at least distinguishing between high pupil-teacher ratios and lower ones.
 
 The distribution of residuals is shown below. We can see that errors can reach as high as 5 but the majority of errors are within 2.5:
 
-```{r}
+
+```{r fig.height =4,  fig.width=6}
 
 dfErrors <- a$errors
 q <- EH_Theme_Histogram()
@@ -172,7 +192,7 @@ Second, the VIF factors from the random forest model above also report median ho
 
 Now we are given a second request. Tutors deployed to areas in need may not necessarily want to live in those areas, as the areas are likely to be economically disadvantaged with few services. Tutors are offered assistance in buying a house of up to $32,000. How might they be directed to towns with home prices that meet their modest budget but are not in the most impoverished areas?
 
-Of course, we can simply give the tutors a table of average home prices per town, but consider the following decision tree below. This suggests that towns where houses tend to have more rooms are going to have a more expensive housing stock. While this makes intuitive sense, it is very handy to have a simple formula.  Tutors who are comfortable with 7 rooms will easily find housing at the level they can afford. Those who need more should look for smaller houses in less affluent towns (but with an lstat over 14), while those who need less can afford smaller houses in the more expensive towns
+Of course, we can simply give the tutors a table of average home prices per town, but consider the usefulness of combining that information with the decision tree below, which examines median home prices gaianst the other variables in the dataset. The tree suggests that towns where houses tend to have more rooms are going to have a more expensive housing stock. While this is common sense, it is very handy to have a simple formula.  Tutors who are comfortable with 7 room houses will easily find housing at the level they can afford. Those who need more should look for smaller houses in less affluent towns (but with a lower status index (lstat) over 14), while those who need less can afford smaller houses in the more expensive towns.
 
 ```{r}
 
