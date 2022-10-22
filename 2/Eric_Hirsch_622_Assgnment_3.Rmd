@@ -16,10 +16,10 @@ knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 ```{r}
 library(tidyverse)
 devtools::install_github("ericonsi/EHData")
+library(ggsci)
 library(EHData)
 library(patchwork)
 library(gridExtra)
-library(ggsci)
 library(caret)
 library(pROC)
 library(car)
@@ -116,38 +116,82 @@ b <- EHModel_RandomForest(df2, "ptratio", categorical=FALSE, seed=3456, printVar
 ```
 ```{r}
 
-df3 <- df2 %>%
-  mutate(highPT = as.numeric(ifelse(ptratio>18.4, 1, 0))) %>%
-  dplyr::select(highPT, indus, medv)
-
-df3b <- df2 %>%
+df3 <- df1 %>%
   mutate(highPT = as.numeric(ifelse(ptratio>18.9, 1, 0))) %>%
-  dplyr::select(-ptratio)
+    dplyr::select(-ptratio)
+  
+df3a <- df1 %>%
+  mutate(highPT = as.numeric(ifelse(ptratio>18.9, 1, 0))) %>%
+  dplyr::select(highPT, tax, dis )
 
 df3c <- df2 %>%
   mutate(highPT = as.numeric(ifelse(ptratio>18.9, 1, 0))) %>%
   dplyr::select(highPT, nox, indus, medv, rad)
 
+df3d <- df3 %>%
+  filter(nox<=.65)
+
 table(df3$highPT)
 
-df3a <- df3 %>%
+df3x <- df3 %>%
   mutate(highPT = as.factor(highPT))
 
-ggplot(df3a, aes(x=indus, y=medv, color=highPT)) +
+ggplot(df3x, aes(x=dis, y=tax, color=highPT)) +
   geom_point()
+
+
+ggplot(df2, aes(x=ptratio, y=nox)) +
+  geom_point()
+
 
 ```
 ```{r}
 
-devtools::install_github("ericonsi/EHData")
+devtools::install_github("ericonsi/EHData", force = TRUE)
 library(EHData)
 library("caret")
-q <- EHModel_DecisionTree(df3c, "highPT", levels=4)
-c <- EHModel_SVM(df3c, "highPT", method="radial", printPlot=FALSE)
-d <- EHModel_RandomForest(df3c, "highPT", categorical=TRUE, printPlot=FALSE, printVarimp = TRUE)
-e <- EHModel_Regression_Logistic(df3c, "highPT")
+library(tidyverse)
+library(ggsci)
+library(EHData)
+library(patchwork)
+library(gridExtra)
+library(pROC)
+library(car)
+
+dfq <- df3a
+
+a <- EHModel_SVM(dfq, "highPT", method="linear", printPlot=TRUE)
+b <- EHModel_SVM(dfq, "highPT", method="radial", printPlot=TRUE)
+c <- EHModel_SVM(dfq, "highPT", method="poly", printPlot=TRUE)
+d <- EHModel_RandomForest(dfq, "highPT", categorical=TRUE, printPlot=FALSE, printVarimp = TRUE)
+e <- EHModel_DecisionTree(dfq, "highPT", categorical=TRUE)
+f <- EHModel_Regression_Logistic(dfq, "highPT")
 
 ```
+
+
+```{r}
+#devtools::install_github("ericonsi/EHData", force = TRUE)
+library(EHData)
+
+
+a1 <- EHCalculate_AUC_ForBinaryClasses(a$errors)
+b1 <- EHCalculate_AUC_ForBinaryClasses(b$errors)
+c1 <- EHCalculate_AUC_ForBinaryClasses(c$errors)
+d1 <- EHCalculate_AUC_ForBinaryClasses(d$errors)
+e1 <- EHCalculate_AUC_ForBinaryClasses(e$errors)
+
+tab <- matrix(c(a1$AUC, a1$ConfusionMatrix$overall["Accuracy"], b1$AUC, b1$ConfusionMatrix$overall["Accuracy"], c1$AUC, c1$ConfusionMatrix$overall["Accuracy"],d1$AUC, d1$ConfusionMatrix$overall["Accuracy"], e1$AUC, e1$ConfusionMatrix$overall["Accuracy"]), ncol=2, byrow=TRUE)
+colnames(tab) <- c('AUC','Accuracy')
+rownames(tab) <- c('SVM - linear','SVM - radial','SVM - poly', 'Random Forest', 'Decision Tree')
+dfTab <- as.data.frame(tab) %>%
+  arrange(desc(AUC))
+
+knitr::kable(dfTab, desc=TRUE)
+
+
+```
+
 
 ```{r}
 
