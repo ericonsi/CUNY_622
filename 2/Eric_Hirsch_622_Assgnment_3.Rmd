@@ -116,13 +116,13 @@ b <- EHModel_RandomForest(df2, "ptratio", categorical=FALSE, seed=3456, printVar
 ```
 ```{r}
 
-df3 <- df1 %>%
-  mutate(highPT = as.numeric(ifelse(ptratio>18.9, 1, 0))) %>%
+df3 <- df2 %>%
+  mutate(highPT = as.numeric(ifelse(ptratio>18.4, 1, 0))) %>%
     dplyr::select(-ptratio)
   
-df3a <- df1 %>%
-  mutate(highPT = as.numeric(ifelse(ptratio>18.9, 1, 0))) %>%
-  dplyr::select(highPT, tax, dis )
+df3a <- df2 %>%
+  mutate(highPT= as.numeric(ifelse(ptratio>18.9, 1, 0))) %>%
+  dplyr::select(highPT, rm, medv)
 
 df3c <- df2 %>%
   mutate(highPT = as.numeric(ifelse(ptratio>18.9, 1, 0))) %>%
@@ -131,14 +131,16 @@ df3c <- df2 %>%
 df3d <- df3 %>%
   filter(nox<=.65)
 
+df3e <- df3 %>%
+ filter(row_number() %% 5 == 1)
+
 table(df3$highPT)
 
 df3x <- df3 %>%
   mutate(highPT = as.factor(highPT))
 
-ggplot(df3x, aes(x=dis, y=tax, color=highPT)) +
+ggplot(df3x, aes(x=rm, y=medv, color=highPT)) +
   geom_point()
-
 
 ggplot(df2, aes(x=ptratio, y=nox)) +
   geom_point()
@@ -158,7 +160,7 @@ library(gridExtra)
 library(pROC)
 library(car)
 
-dfq <- df3a
+dfq <- df3e
 
 a <- EHModel_SVM(dfq, "highPT", method="linear", printPlot=TRUE)
 b <- EHModel_SVM(dfq, "highPT", method="radial", printPlot=TRUE)
