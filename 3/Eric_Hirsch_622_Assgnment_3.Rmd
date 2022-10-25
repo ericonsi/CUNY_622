@@ -1,0 +1,224 @@
+---
+title: "SVM vs Random Forest - A Literature Review and Analysis"
+subtitle: "CUNY 622 - Assignment 3" 
+author: "Eric Hirsch"
+date: "10/25/2022"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 4
+---
+
+### I. Essay
+
+For this assignment we discuss the advantages and disadvantages of random forest versus SVM, both in the literature and in practice with the previous assignment’s data set. As a starting point, two example articles were offered which predicted Covid positive cases using decision tree ensembles and SVM, respectively.  
+
+Because of the extreme imbalance between positive and negative cases, the authors of the decision tree ensemble article used decision tree ensembles specifically designed for imbalanced data sets (for example, balanced random forest).  Special sampling techniques were also applied to address the imbalance of the data set.  The best AUC score (.881) was achieved with RUSbagging.
+
+The SVM article’s analysis was slightly more complex, in that it predicted whether a client had no infection, mild infection or serious infection. The model was effective, particularly in predicting severe cases, with an F1 score of .97. The article makes the claim that “SVM works best in predicting COVID-19 cases with maximum accuracy.” To support this claim, they performed a comparative study of supervised learning models, including Random Forest.  SVM achieved higher F1 scores than the others.
+
+That SVM is the superior model in predicting Covid cases generally is a rather bold statement which can’t be justified by one study. There are too many variables – the particular kind and nature of the data collected for the study, the types and tunings of the machine learning algorithms (for example, this study did not consider the “ balanced” random forest algorithms that were featured in the first article), and the study design (such as breaking down the classes into no infection, mild or serious).
+
+An examination of articles which compare SVM and random forest in the field of Geography (while I am no longer in this field, it’s where I got my education – Berkeley PhD 1996) do not show the superiority of one algorithm over the other.  Indeed, there is little consistency either for which algorithm is favored, or for how performance is to be predicted and compared.  For example, a study of multispectral images to predict canopy nitrogen weight in corn showed that random forests were only marginally better than SVR (Support Vector Regression) but that the concepts and analysis were easier to interpret with random forests. A study of groundwater mapping showed a higher AUC for random forest than for SVM tested with a linear, polynomial, sigmoid, and radial kernel.  Likewise, a study of sediment transport in the Tigris-Euphrates river also found that random forest predicted better than SVM.  
+
+In contrast, a study predicting dominant tree species from Landsat images taken of the Krkonose mountains in the Czech Republic, found that SVM performed better than random forest in that particular study, but acknowledged that random forest consistently provided better results in other studies when spatial resolution was low, while SVM appeared to perform better when there were significantly more features.  A study of images by the satellite remote-sensing Sentinel-2A also found that SVM was most accurate (95.17%).
+
+A systematic review conducted in 2020 of 250 peer-reviewed papers on remote-sensing image classification showed that despite some inroads from deep learning, SVM and random forest remained the two most popular image classification techniques, mainly due to lower computational complexity.  SVM is seen to be particularly effective where there is high dimensionality and limited training samples, while random forest is easier to use (fewer  hyper parameters to tune) and more flexible with more complex classifications. Both tend to be highly accurate, although, some  researchers still tout one or the other as the more superior without any strong basis.
+
+As the researchers pointed out, SVM largely depends on the selection of the right kernel function – radial and polynomial tend to be popular in the remote-sensing field.  The binary nature of SVM also creates complications for its use in multiclass scenarios, which occur frequently in remote-sensing, although these can be overcome.  The ability of SVMs to manage small training sets and operate within high dimensional spaces (which is particularly applicable to remote-sensing image data) make SVMs attractive.
+
+Random Forest, on the other hand, is popular because the decision-making process behind it is clearer and more understandable, it is easily implemented in parallel structure for geo-big data computing, it can handle thousands of input variables, is robust to outliers and noise, and is computationally lighter than other tree ensemble methods.
+
+These recommendations echo those  of the machine learning literature. Both algorithms are … that random forest is better with … while SVM is better when …
+
+Beyond these general recommendations, however, the superiority of one algorithm over the other may depend on the idiosyncrasies of the data set you’re looking at.  It is wise to examine the performance of both before assuming one will perform better than the other.  We can illustrate some of this with the database from the previous assignment.
+
+The database contains 466 records of small towns in the Northeast, together with statistics on poverty, industrialization, pollution, crime rate and so on. In the previous assignment, we performed regression analysis on the pupil teacher ratio using random forest.  We determined the root mean squared error of predictions on attests that to be .75.  An examination of residuals found them to be normally distributed – since the mean is 18.4, this RMSE suggested that the algorithm was effective in distinguishing between high and low people-teacher ratios.
+For the purposes of comparison with SVM, we created a binary variable containing high PT ratio (the mean and above), and low PT ratio (below the mean.)  We ran three support vector machines (linear, radial, and polynomial) as well as a random forest and a decision tree.  All of the algorithms were optimized for the parameters which may be tuned.
+
+When all of the variables were included in the data set, random forest performed significantly better than SVM (98% AUC vs. 84% for SVM using a radial kernel). Even a simple decision tree yielded a higher AUC (85%).  
+
+We investigated possible reasons that SVM performs so poorly in this data set.  It was found that for certain variables (pollution being a prime example), there were anomalous cohorts that were driving the analysis. For example, there was a sizable cohort of schools all at a PT ratio of exactly 21. Further, all of the schools above a pollution index of .65 were in this cohort.  There is no indication in the data set documentation for what this cohort means but it may relate to state regulations capping the number of pupils in the class.
+
+Although pollution was barely linearly correlated with PT ratio (1.7), the random forest algorithm relied heavily on it, as anomalies like these lend themselves well to a binary decision point.  Indeed, using pollution alone, random forest achieved a 98% AUC on predictions of the evaluation set.  The SVM algorithm (AUC=82%), which only looks at the support vectors, did not appear to benefit from this information. The evidence for this was that when the cohort was removed, the AUC for random forest dropped significantly while the AUC for SVM remained the same.  In addition, when the algorithms were run on a data set with minimal columns which were not affected by the “anomalous cohort” phenomenon, radial SVM outperformed all of the other algorithms and polynomial SVM was second.
+
+We also tested the assertion that SVM  performs better in high dimensional, low sample data by taking only every fifth record in the data set, reducing it to 94 rows with 12 columns. In this case, SVM does in fact catch up to Random Forest, producing almost the same results.  
+This analysis shows that it’s important to test both algorithms in the data as the reason for the superiority of one performance over the other may not be readily apparent.  It can, however, be worthwhile to investigate further what it is about the data shape that favors one over the other.
+
+### II. Analysis
+
+In this part of the assignment we compare SVM to the Random Forest analysis we performed last week.
+
+#### A. Description
+
+```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```
+
+```{r}
+library(tidyverse)
+devtools::install_github("ericonsi/EHData")
+library(ggsci)
+library(EHData)
+library(patchwork)
+library(gridExtra)
+library(caret)
+library(pROC)
+library(car)
+
+```
+
+```{r}
+
+df1 <- read.csv("D:\\RStudio\\CUNY_622\\3\\CrimeRate.csv")
+
+```
+
+
+The data set consists of 466 observations of data realted to small towns in the North East. There are 11 numeric variables and two binary variables. There are no missing values. The variables include the level of industrialization, average tax rates, pollution levels, and so on. This data set is often used to predict crime rates, but we won’t use it for that purpose. 
+
+These are the variables:
+
+•	zn: proportion of residential land zoned for large lots (over 25000 square feet)\
+•	indus: proportion of non-retail business acres per suburb\
+•	chas: a dummy var. for whether the suburb borders the Charles River (1) or not (0)\
+•	nox: nitrogen oxides concentration (parts per 10 million)\
+•	rm: average number of rooms per dwelling\
+•	age: proportion of owner-occupied units built prior to 1940\
+•	dis: weighted mean of distances to five Boston employment centers\
+•	rad: index of accessibility to radial highways\
+•	tax: full-value property-tax rate per $10,000\
+•	ptratio: pupil-teacher ratio by town\
+•	lstat: lower status of the population (percent)\
+•	medv: median value of owner-occupied homes in $1000s\
+•	crime: whether the crime rate is above the median crime rate (1) or not (0)
+
+We will drop taxes (because they are 90% correlated with radial highways) and create a new variable, HighPTRatio, so that we can perform a binary analysis.
+
+#### B. Distributions
+
+When we examine histograms we see that a number of variables have distributions that are broken and uneven (zn, indus, nox and rad), suggesting possible hidden groupings. As we will see later, this may lend itself well to decision tree/random forest algorithms.  Many of the distributions are also skewed and we can see some likely outliers.  However, both models are robust to outliers so we don't do transformations here.
+ 
+```{r}
+
+library(psych)
+
+a <- EHSummarize_SingleColumn_Histograms(df1)
+grid.arrange(grobs=a, ncol=3, nrow=5)
+
+```
+
+#### C. Analysis
+
+We prepare various datasets for analysis:
+
+```{r}
+
+df2 <- df1 %>%
+  dplyr:: select(-tax)
+
+dfAll <- df2 %>%
+  mutate(highPT = as.numeric(ifelse(ptratio>18.4, 1, 0))) %>%
+    dplyr::select(-ptratio)
+  
+dfRM_and_MEDV_only <- df2 %>%
+  mutate(highPT= as.numeric(ifelse(ptratio>18.4, 1, 0))) %>%
+  dplyr::select(highPT, rm, medv)
+
+df3High_Nox_Filtered_Out <- dfAll %>%
+  filter(nox<=.65)
+
+df3Sparse <- dfAll %>%
+ filter(row_number() %% 5 == 1)
+
+df3CohortsLabeled <- dfAll %>%
+  mutate(highNoxCohort = as.numeric(ifelse(nox>.65, 1, 0))) %>%
+  mutate(highRadCohort = as.numeric(ifelse(rad>20, 1, 0)))
+
+df3x <- dfAll %>%
+  mutate(highPT = as.factor(highPT))
+
+ggplot(df3x, aes(x=rm, y=medv, color=highPT)) +
+  geom_point()
+
+ggplot(df2, aes(x=ptratio, y=nox)) +
+  geom_point()
+
+
+```
+```{r}
+RunAnalyses <- function(df) {
+  
+devtools::install_github("ericonsi/EHData", force = TRUE)
+library(EHData)
+library("caret")
+library(tidyverse)
+library(ggsci)
+library(EHData)
+library(patchwork)
+library(gridExtra)
+library(pROC)
+library(car)
+
+dfq <- df
+
+print (" ")
+print ("SVM - LINEAR")
+print (" ")
+a <- EHModel_SVM(dfq, "highPT", method="linear", printPlot = FALSE,  printSVM = TRUE, printConfusionMatrix = TRUE)
+print (" ")
+print ("SVM - RADIAL")
+print (" ")
+b <- EHModel_SVM(dfq, "highPT", method="radial", printSVM =  TRUE, printPlot = FALSE, printConfusionMatrix = TRUE)
+print (" ")
+print ("SVM - POLY")
+print (" ")
+c <- EHModel_SVM(dfq, "highPT", method="poly", printPlot=FALSE, printSVM = TRUE, printConfusionMatrix = TRUE)
+print (" ")
+print ("SVM - RANDOM FOREST")
+print (" ")
+d <- EHModel_RandomForest(dfq, "highPT", categorical = TRUE, printPlot=FALSE, printRF = TRUE, printConfusionMatrix = TRUE)
+print (" ")
+print ("DECISION TREE")
+print (" ")
+e <- EHModel_DecisionTree(dfq, "highPT", categorical=TRUE, printDT=TRUE, printFancyTree = FALSE, printConfusionMatrix=TRUE)
+#f <- EHModel_Regression_Logistic(dfq, "highPT")
+
+#devtools::install_github("ericonsi/EHData", force = TRUE)
+library(EHData)
+  library(caTools)
+  library(ROCR)
+
+a1 <- EHCalculate_AUC_ForBinaryClasses(a$errors, printPlot=FALSE, printConfusionMatrix = FALSE)
+b1 <- EHCalculate_AUC_ForBinaryClasses(b$errors, printPlot=FALSE, printConfusionMatrix = FALSE)
+c1 <- EHCalculate_AUC_ForBinaryClasses(c$errors, printPlot=FALSE, printConfusionMatrix = FALSE)
+d1 <- EHCalculate_AUC_ForBinaryClasses(d$errors, printPlot=FALSE, printConfusionMatrix = FALSE)
+e1 <- EHCalculate_AUC_ForBinaryClasses(e$errors, printPlot=FALSE, printConfusionMatrix = FALSE)
+
+tab <- matrix(c(a1$AUC, a1$ConfusionMatrix$overall["Accuracy"], b1$AUC, b1$ConfusionMatrix$overall["Accuracy"], c1$AUC, c1$ConfusionMatrix$overall["Accuracy"],d1$AUC, d1$ConfusionMatrix$overall["Accuracy"], e1$AUC, e1$ConfusionMatrix$overall["Accuracy"]), ncol=2, byrow=TRUE)
+colnames(tab) <- c('AUC','Accuracy')
+rownames(tab) <- c('SVM - linear','SVM - radial','SVM - poly', 'Random Forest', 'Decision Tree')
+dfTab <- as.data.frame(tab) %>%
+  arrange(desc(AUC))
+
+knitr::kable(dfTab, desc=TRUE)
+
+
+}
+
+```
+
+
+##### 1. The Full Dataset
+
+```{r}
+
+RunAnalyses(dfAll)
+
+```
+
+#### Conclusion\
+\
+
+In short, random forest and decision tree algorithms both have their uses. Always reflexively choosing an algorithm because it predicts best is akin to always choosing a Ferrari over a rickety school bus because it goes faster. It’s fine until you have to transport 150 crying 6-year-olds to the local zoo.  Algorithms don’t stand on their own but are used to solve problems, and the nature of the solution needs to match the nature of the problem.
+
