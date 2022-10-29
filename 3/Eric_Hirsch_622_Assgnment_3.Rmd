@@ -6,7 +6,7 @@ date: "10/25/2022"
 output:
   pdf_document:
     toc: true
-    toc_depth: 4
+    toc_depth: 5
 ---
 
 ### I. Essay
@@ -40,7 +40,7 @@ When all of the variables were included in the data set, random forest performed
 
 We investigated possible reasons that SVM performs so poorly in this data set.  It was found that for certain variables (pollution being a prime example), there were anomalous cohorts that were driving the analysis. For example, there was a sizable cohort of schools all at a PT ratio of exactly 21. Further, all of the schools above a pollution index of .65 were in this cohort.  There is no indication in the data set documentation for what this cohort means but it may relate to state regulations capping the number of pupils in the class.
 
-Although pollution was barely linearly correlated with PT ratio (1.7), the random forest algorithm relied heavily on it, as anomalies like these lend themselves well to a binary decision point.  Indeed, using pollution alone, random forest achieved a 98% AUC on predictions of the evaluation set.  The SVM algorithm (AUC=82%), which only looks at the support vectors, did not appear to benefit from this information. The evidence for this was that when the cohort was removed, the AUC for random forest dropped significantly while the AUC for SVM remained the same.  In addition, when the algorithms were run on a data set with minimal columns which were not affected by the “anomalous cohort” phenomenon, radial SVM outperformed all of the other algorithms and polynomial SVM was second.
+Although pollution was barely linearly correlated with PT ratio (1.7), the random forest algorithm relied on it, as anomalies like these lend themselves well to a binary decision point.  Indeed, using pollution alone, random forest achieved a 98% AUC on predictions of the evaluation set.  The SVM algorithm (AUC=82%), which only looks at the support vectors, did not appear to benefit from this information. The evidence for this was that when the cohort was removed, the AUC for random forest dropped significantly while the AUC for SVM remained the same.  In addition, when the algorithms were run on a data set with minimal columns which were not affected by the “anomalous cohort” phenomenon, radial SVM outperformed all of the other algorithms and polynomial SVM was second.
 
 We also tested the assertion that SVM  performs better in high dimensional, low sample data by taking only every fifth record in the data set, reducing it to 94 rows with 12 columns. In this case, SVM does in fact catch up to Random Forest, producing almost the same results.  
 This analysis shows that it’s important to test both algorithms in the data as the reason for the superiority of one performance over the other may not be readily apparent.  It can, however, be worthwhile to investigate further what it is about the data shape that favors one over the other.
@@ -51,8 +51,8 @@ In this part of the assignment we compare SVM to the Random Forest analysis we p
 
 #### A. Description
 
-```{r setup, include=FALSE, warning=FALSE, message=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+```{r setup}
+knitr::opts_chunk$set()
 ```
 
 ```{r}
@@ -74,7 +74,6 @@ df1 <- read.csv("D:\\RStudio\\CUNY_622\\3\\CrimeRate.csv")
 
 ```
 
-
 The data set consists of 466 observations of data realted to small towns in the North East. There are 11 numeric variables and two binary variables. There are no missing values. The variables include the level of industrialization, average tax rates, pollution levels, and so on. This data set is often used to predict crime rates, but we won’t use it for that purpose. 
 
 These are the variables:
@@ -93,9 +92,9 @@ These are the variables:
 •	medv: median value of owner-occupied homes in $1000s\
 •	crime: whether the crime rate is above the median crime rate (1) or not (0)
 
-We will drop taxes (because they are 90% correlated with radial highways) and create a new variable, HighPTRatio, so that we can perform a binary analysis.
+We will drop taxes (because they are 90% correlated with radial highways) and create a new binary variable, HighPTRatio (pupil teacher ratio above the mean = 1), so that we can perform a binary analysis.
 
-#### B. Distributions
+#### B. The Relationship Between Distribution and Algorithm Effectiveness
 
 When we examine histograms we see that a number of variables have distributions that are broken and uneven (zn, indus, nox and rad), suggesting possible hidden groupings. As we will see later, this may lend itself well to decision tree/random forest algorithms.  Many of the distributions are also skewed and we can see some likely outliers.  However, both models are robust to outliers so we don't do transformations here.
  
@@ -108,11 +107,10 @@ grid.arrange(grobs=a, ncol=3, nrow=5)
 
 ```
 
-#### C. Analysis
-
-We prepare various datasets for analysis:
+When we examine some of these broken distributions further, we see the existence of idiosyncratic cohorts in the relationship with PTRatio. In particluar, when we look at a scatterplot for PTRatio on two broken distributions (nox and rad) vs two smooth ones (medv and rm), we see two distinctly different data shapes underlying this dataset.  This will become a factor later when it appears that Random Forest handles these idiosyncratic regions better than SVM, and that SVM handles the smoother regions better. 
 
 ```{r}
+
 
 df2 <- df1 %>%
   dplyr:: select(-tax)
@@ -120,6 +118,31 @@ df2 <- df1 %>%
 dfAll <- df2 %>%
   mutate(highPT = as.numeric(ifelse(ptratio>18.4, 1, 0))) %>%
     dplyr::select(-ptratio)
+
+df3x <- dfAll %>%
+  mutate(highPT = as.factor(highPT))
+
+df3Nox <- dfAll %>%
+  dplyr::select(highPT, nox)
+
+g2 <- ggplot(df3x, aes(x=rad, y=nox, color=highPT)) +
+  geom_point() +
+    labs(title = str_wrap("Rad and Nox: Random Forest Performs Better", 5))
+
+g3 <- ggplot(df3x, aes(x=rm, y=medv, color=highPT)) +
+  geom_point() +
+    labs(title = str_wrap("Rm and Medv: SVM Performs Better", 5))
+
+grid.arrange(g2, g3, ncol=2)
+
+```
+
+#### C. Analysis
+
+We prepare various datasets for analysis:
+
+```{r}
+
   
 dfRM_and_MEDV_only <- df2 %>%
   mutate(highPT= as.numeric(ifelse(ptratio>18.4, 1, 0))) %>%
@@ -129,25 +152,17 @@ df3High_Nox_Filtered_Out <- dfAll %>%
   filter(nox<=.65)
 
 df3Sparse <- dfAll %>%
- filter(row_number() %% 5 == 1)
+ filter(row_number() %% 5 == 1) %>%
+  dplyr::select(-chas)
 
 df3CohortsLabeled <- dfAll %>%
   mutate(highNoxCohort = as.numeric(ifelse(nox>.65, 1, 0))) %>%
   mutate(highRadCohort = as.numeric(ifelse(rad>20, 1, 0)))
 
-df3x <- dfAll %>%
-  mutate(highPT = as.factor(highPT))
-
-ggplot(df3x, aes(x=rm, y=medv, color=highPT)) +
-  geom_point()
-
-ggplot(df2, aes(x=ptratio, y=nox)) +
-  geom_point()
-
 
 ```
 ```{r}
-RunAnalyses <- function(df) {
+RunAnalyses <- function(df, title="") {
   
 devtools::install_github("ericonsi/EHData", force = TRUE)
 library(EHData)
@@ -201,24 +216,106 @@ rownames(tab) <- c('SVM - linear','SVM - radial','SVM - poly', 'Random Forest', 
 dfTab <- as.data.frame(tab) %>%
   arrange(desc(AUC))
 
-knitr::kable(dfTab, desc=TRUE)
+q <- knitr::kable(dfTab, desc=TRUE, caption=title, digits=2)
+q
 
+return(q)
 
 }
 
 ```
 
+We run three varieties of SVM (linear, radial and poly), as well as Random Forest and Decision Tree on several datasets and compare performance. Hyperparameters have been tuned and algorithms maximized using a grid approach.
 
 ##### 1. The Full Dataset
 
 ```{r}
 
-RunAnalyses(dfAll)
+an1 <- RunAnalyses(dfAll, "Predicting PTRatio, Full Dataset")
 
 ```
+
+```{r}
+
+print(an1)
+```
+
+
+Both decision tree algorithms are the highest performers, with Random Forest showing 97% accuracy.  Rad and Nox figure prominently in the analysis.
+
+##### 1. NOX Only
+
+```{r}
+
+an1a <- RunAnalyses(df3Nox, "Prediciting PTRatio: NOX Only")
+
+```
+
+```{r}
+
+print(an1a)
+```
+
+Even using NOX alone, Random Forest achieves a 93% accuracy rate.
+
+##### 2. High NOX Removed
+
+```{r}
+
+an2 <-RunAnalyses(df3High_Nox_Filtered_Out, "Predicting PTRatio: High Nox Removed")
+
+```
+
+```{r}
+
+print(an2)
+
+```
+
+
+Now the performance for Random Forest drops considerably.  For SVM there is little change. SVM is now the second best algorithm.
+
+##### 3. RM and MEDV Only
+
+```{r}
+
+an3 <-RunAnalyses(dfRM_and_MEDV_only, "Predicting PTRatio: RM and MEDV Only")
+
+```
+
+```{r}
+
+print(an3)
+
+
+```
+
+With RM and MEDV, two smoothly distributed variables, SVM poly now performs best. Random Forest is worse than the other SVM algorithms.  That one decision tree performs better than random forest is probably a matter of luck - since random forest averages performance it stands to reason a particular decision tree may perform better than average.
+
+
+Now the performance for Random Forest drops considerably.  For SVM there is little change. SVM is now the second best algorithm.
+
+##### 4. Sparse Dataset
+
+```{r}
+
+
+an4 <-RunAnalyses(df3Sparse, "Predicting PTRatio: Sparse Dataset")
+
+```
+
+```{r}
+
+print(an4)
+
+
+```
+
+With 20% of the dataset chosen at random, SVM's performance is a lot closer to Random Forest, though it still falls behind.
+
 
 #### Conclusion\
 \
 
-In short, random forest and decision tree algorithms both have their uses. Always reflexively choosing an algorithm because it predicts best is akin to always choosing a Ferrari over a rickety school bus because it goes faster. It’s fine until you have to transport 150 crying 6-year-olds to the local zoo.  Algorithms don’t stand on their own but are used to solve problems, and the nature of the solution needs to match the nature of the problem.
+The literature suggests that both algorithms may perfom well under different circumstances.  In this dataset, Random Forest performs.  However, the literature does not generally point to exactly why one algorithm outperforms the other, unless the dataset is sparse or contains low-level imagery, etc.  The existence of many broken distributions and idiosyncratic cohorts may help to explain Random Forest's success. When run on only the smoothly distributed data, SVM was superior.  This observation may not be generalizable.
 
