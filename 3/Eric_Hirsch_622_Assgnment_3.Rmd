@@ -27,9 +27,7 @@ A systematic review conducted in 2020 of 250 peer-reviewed papers on remote-sens
 
 As the researchers pointed out, SVM largely depends on the selection of the right kernel function – radial and polynomial tend to be popular in the remote-sensing field.  The binary nature of SVM also creates complications for its use in multiclass scenarios, which occur frequently in remote-sensing, although these can be overcome.  The ability of SVMs to manage small training sets and operate within high dimensional spaces (which is particularly applicable to remote-sensing image data) make SVMs attractive.
 
-Random Forest, on the other hand, is popular because the decision-making process behind it is clearer and more understandable, it is easily implemented in parallel structure for geo-big data computing, it can handle thousands of input variables, is robust to outliers and noise, and is computationally lighter than other tree ensemble methods.
-
-These recommendations echo those  of the machine learning literature. Both algorithms are … that random forest is better with … while SVM is better when …
+Random Forest, on the other hand, is popular because the decision-making process behind it is clearer and more understandable, it is easily implemented in parallel structure for geo-big data computing, it can handle thousands of input variables, is robust to outliers and noise, and is computationally lighter than other tree ensemble methods.  These recommendations echo those  of the machine learning literature.
 
 Beyond these general recommendations, however, the superiority of one algorithm over the other may depend on the idiosyncrasies of the data set under examination.  It is wise to examine the performance of both before assuming one will perform better than the other.  We can illustrate this with the database from the previous assignment.
 
