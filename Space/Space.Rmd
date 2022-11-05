@@ -119,6 +119,8 @@ dfTest3 <- dfTest2
 ```
 
 
+
+
 ```{r}
 
 
@@ -161,6 +163,37 @@ dfTrain5Num <- dfTrain5 %>%
 
 
 ```
+
+```{r}
+dfGroups <- dfTrain %>% dplyr::select(PassengerId, Transported) %>% dplyr::rename(PassengerID=1)
+result <- dfGroups %>% mutate(Transported=ifelse(Transported=='True',1,0))
+
+dfGroups$Group <- sub("\\_.*", "", result$PassengerID)
+result$Group <- sub("\\_.*", "", result$PassengerID)
+dfGroups$Transported = as.numeric(dfGroups$Transported)
+dfGroups$Transported = ifelse(dfGroups$Transported==1,0,1)
+
+dfGroupsSum <- dfGroups %>%
+  group_by(Group) %>%
+  summarize(PredPercent= sum(Transported)/n())
+
+dfGroupsSum$Determination <- ifelse(dfGroupsSum$PredPercent>.5, "True", ifelse(dfGroupsSum$PredPercent==.5, "None", "False"))
+
+new <- as.data.frame(lapply(result, function(x) dfGroupsSum$Determination[match(x, dfGroupsSum$Group)]))
+
+result2 <- cbind(result, "Determination"=new$Group)
+
+result3 <- result2 %>%
+  mutate(Transported = ifelse(Transported==1,"False","True")) %>%
+  mutate(Transported2 = ifelse(Determination=="None",Transported,Determination))  %>%
+  dplyr::select(PassengerID, Transported2) %>%
+  dplyr::rename(Transported=2)
+
+
+
+
+```
+
 
 ```{r}
 
@@ -211,8 +244,51 @@ heatmap(qq, Rowv = NA, Colv = NA)
 dfSmall <- dfTrain5 %>%
   dplyr::filter(row_number() %% 10 ==1) 
 
-qq <- EHModel_RandomForest(dfSmall, "Transported")
+qq <- EHModel_RandomForest(dfTrain5, "Transported")
 ```
+
+```{r}
+
+ #BEST MODEL!!
+library(gbm)
+boost=gbm(Transported ~ . ,data = dfTrain5, distribution = "gaussian",n.trees = 10000,
+                  shrinkage = 0.01, interaction.depth = 4)
+boost
+
+summary(boost) #Summary gives a table of Variable Importance and a plot of Variable Importance
+
+predictions2 <- as.data.frame(predict(boost, dfTest5)) %>%
+  rename(Transported = 1) 
+
+result <- as.data.frame(cbind(dfTest5$PassengerID, predictions2$Transported)) %>%
+  rename(PassengerID = 1, Transported=2) %>%
+  mutate(Transported = ifelse(Transported>.5,'True','False'))
+
+
+
+write_csv(result, "C:\\Users\\Eric\\Desktop\\SVMpredictions5.csv")
+
+```
+
+
+```{r}
+
+ww <- EHModel_Regression_Logistic(dfTrain5, 'Transported',returnLM = TRUE)
+ww4 <- glm(Transported ~., data = dfTrain5, family = binomial(link = "logit"))
+
+
+predictions2 <- as.data.frame(predict(ww4, dfTest5)) %>%
+  rename(Transported = 1) 
+
+result <- as.data.frame(cbind(dfTest5$PassengerID, predictions2$Transported)) %>%
+  rename(PassengerID = 1, Transported=2)   %>%
+  mutate(Transported = ifelse(Transported>.5,'True','False'))
+
+write_csv(result, "C:\\Users\\Eric\\Desktop\\SVMpredictions5.csv")
+
+```
+
+
 
 ```{r}
 
