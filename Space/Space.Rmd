@@ -91,7 +91,7 @@ summary(dfTest)
 ```
 ```{r}
 dfTrain1 <- na.omit(dfTrain)
-dfTest1 <- EHPrepare_MissingValues_Imputation(dfTest)
+dfTest1 <- EHPrepare_MissingValues_Imputation(dfTest, impute="median")
 ```
 
 
@@ -104,11 +104,15 @@ dfTrain2 <- dfTrain1 %>%
   dplyr::select(-Cabin) %>%
   mutate(Transported=ifelse(Transported=="True",1,0))
 
+#dfTrain2$Group <- sub("\\_.*", "", dfTrain2$PassengerId)
+
 dfTest1$Cabin1 <- substr(dfTest1$Cabin,1,1)
 dfTest1$Cabin2 <- str_sub(dfTest1$Cabin, - 1, - 1) 
 
 dfTest2 <- dfTest1 %>%
   dplyr::select(-Cabin)
+
+#dfTest2$Group <- sub("\\_.*", "", dfTest2$PassengerId)
 
 dfTrain3 <- dfTrain2
 dfTest3 <- dfTest2
@@ -203,12 +207,54 @@ heatmap(qq, Rowv = NA, Colv = NA)
 ```
 
 
+```{r}
+dfSmall <- dfTrain5 %>%
+  dplyr::filter(row_number() %% 10 ==1) 
+
+qq <- EHModel_RandomForest(dfSmall, "Transported")
+```
 
 ```{r}
-dfx2RFSmall <- dfTrain5 %>%
-  dplyr::filter(row_number() %% 2 ==1)
 
-a <- EHModel_RandomForest(dfx2RFSmall, "Transported", categorical=TRUE)
+predictions2 <- as.data.frame(predict(qq$rf, dfTest5)) %>%
+  rename(Transported = 1) 
+
+
+#dfTest2$Group <- sub("\\_.*", "", dfTest2$PassengerId)
+
+result <- as.data.frame(cbind(dfTest5$PassengerID, predictions2$Transported)) %>%
+  rename(PassengerID = 1, Transported=2) 
+
+dfGroups <- result
+dfGroups$Group <- sub("\\_.*", "", result$PassengerID)
+result$Group <- sub("\\_.*", "", result$PassengerID)
+dfGroups$Transported = as.numeric(dfGroups$Transported)
+dfGroups$Transported = ifelse(dfGroups$Transported==1,0,1)
+
+dfGroupsSum <- dfGroups %>%
+  group_by(Group) %>%
+  summarize(PredPercent= sum(Transported)/n())
+
+dfGroupsSum$Determination <- ifelse(dfGroupsSum$PredPercent>.5, "True", ifelse(dfGroupsSum$PredPercent==.5, "None", "False"))
+
+new <- as.data.frame(lapply(result, function(x) dfGroupsSum$Determination[match(x, dfGroupsSum$Group)]))
+
+result2 <- cbind(result, "Determination"=new$Group)
+
+result3 <- result2 %>%
+  mutate(Transported = ifelse(Transported==1,"False","True")) %>%
+  mutate(Transported2 = ifelse(Determination=="None",Transported,Determination))  %>%
+  dplyr::select(PassengerID, Transported2) %>%
+  dplyr::rename(Transported=2)
+
+
+
+
+#  mutate(Transported = ifelse(Transported==1,'False','True'))
+
+
+
+write_csv(result3, "C:\\Users\\Eric\\Desktop\\SVMpredictions4.csv")
 
 ```
 
