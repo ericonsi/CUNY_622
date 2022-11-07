@@ -165,21 +165,23 @@ dfTrain5Num <- dfTrain5 %>%
 ```
 
 ```{r}
-dfGroups <- dfTrain %>% dplyr::select(PassengerId, Transported) %>% dplyr::rename(PassengerID=1)
-result <- dfGroups %>% mutate(Transported=ifelse(Transported=='True',1,0))
+Group2 <- dfTrain %>% dplyr::select(PassengerId, Transported)
+Group2 <- Group2 %>% mutate(Transported=ifelse(Transported=='True',1,0))
 
-dfGroups$Group <- sub("\\_.*", "", result$PassengerID)
-result$Group <- sub("\\_.*", "", result$PassengerID)
-dfGroups$Transported = as.numeric(dfGroups$Transported)
-dfGroups$Transported = ifelse(dfGroups$Transported==1,0,1)
+Group2$Group <- sub("\\_.*", "", Group2$PassengerId)
 
-dfGroupsSum <- dfGroups %>%
+Group2Sum <- Group2 %>%
   group_by(Group) %>%
-  summarize(PredPercent= sum(Transported)/n())
+  summarize(PredPercent= sum(Transported)/n(), count=n())
 
-dfGroupsSum$Determination <- ifelse(dfGroupsSum$PredPercent>.5, "True", ifelse(dfGroupsSum$PredPercent==.5, "None", "False"))
+Group2SumGroups <- Group2Sum %>%
+  filter(count>1)
 
-new <- as.data.frame(lapply(result, function(x) dfGroupsSum$Determination[match(x, dfGroupsSum$Group)]))
+hist(Group2SumGroups$PredPercent)
+
+Group2Sum$Determination <- ifelse(Group2Sum$PredPercent>.5, "True", ifelse(Group2Sum$PredPercent==.5, "None", "False"))
+
+new <- as.data.frame(lapply(result, function(x) Group2Sum$Determination[match(x, Group2Sum$Group)]))
 
 result2 <- cbind(result, "Determination"=new$Group)
 
@@ -439,11 +441,77 @@ fviz_cluster(k2, data = dfNum)
 ```
 
 
+```{r}
+library(xgboost)
+library(caret)
+#BEST MODEL 221106-1123
+
+#make this example reproducible
+set.seed(0)
+
+dfTrain5$Transported = as.character(dfTrain5$Transported)
+dfTrain5a <- dfTrain5 %>%
+  mutate(Tot = VRDeck + ShoppingMall + Spa + RoomService + FoodCourt) %>%
+  dplyr::select(-Spa)
+
+dfTest5a <- dfTest5 %>%
+  mutate(Tot = VRDeck + ShoppingMall + Spa + RoomService + FoodCourt) %>%
+  dplyr::select(-Spa)
+
+train_x <- dfTrain5 %>%
+  dplyr::select(-Transported)
+train_y <- dfTrain5 %>%
+  dplyr::select(Transported)
+
+dfTest6 <- dfTest5
+dfTest6$Transported = "1"
+
+test_x <- dfTest6 %>%
+  dplyr::select(-Transported,-PassengerID)
+test_y <- dfTest6 %>%
+  dplyr::select(Transported)
+
+#define final training and testing sets
+xgb_train <- xgb.DMatrix(data = as.matrix(train_x), label = as.matrix(train_y))
+xgb_test <- xgb.DMatrix(data = as.matrix(test_x), label = as.matrix(test_y))
+
+#tRIAL AND ERROR GAVE 55 AS BEST- COULD TRY OTHERS
+
+model2 <- xgb.train(data = xgb_train, max.depth = 3, nrounds = 55)
+
+```
 
 ```{r}
 
 
+predictions <- predict(model2,newdata=xgb_test)
+predictions <- data.frame(as.vector(predictions)) 
+predictions$PassengerId <- dfTest5$PassengerID
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("PassengerID", "Transported")
+
+predictions <- predictions %>%
+  mutate(Transported=ifelse(Transported>.5,'True','False'))
+
+write_csv(predictions, "C:\\Users\\Eric\\Desktop\\XGBpredictions1.csv")
+
+makePredictions2 <- function(model)
+{
+predictions <- predict(model,newdata=dfTest5)
+predictions <- data.frame(as.vector(predictions))
+predictions$PassengerId <- dfTest5$PassengerID
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("PassengerID", "Transported")
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\SVMpredictions2.csv")
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
+}
+
+#makePredictions2(a$rf)
+#makePredictions2(b$svm)
+#makePredictions2(c)
 
 ```
+
+
 
 
