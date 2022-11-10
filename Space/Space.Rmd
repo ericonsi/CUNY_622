@@ -89,9 +89,53 @@ str(dfTrain)
 summary(dfTest)
 
 ```
+
 ```{r}
-dfTrain1 <- na.omit(dfTrain)
-dfTest1 <- EHPrepare_MissingValues_Imputation(dfTest, impute="median")
+
+Group2 <- dfTrain %>% dplyr::select(PassengerId, Transported) %>% mutate(Transported=ifelse(Transported=='True',1,0))
+
+Group2$Group <- sub("\\_.*", "", Group2$PassengerId)
+
+Group2Sum <- Group2 %>%
+  group_by(Group) %>%
+  summarize(PredPercent= sum(Transported)/n(), count=n())
+
+Group2SumGroups <- Group2Sum %>%
+  filter(count>1)
+
+hist(Group2SumGroups$PredPercent)
+
+
+dfTrainA <- dfTrain
+
+dfTrainA$Group <- Group2$Group
+
+dfTrainAA <- inner_join(dfTrainA, Group2Sum, by="Group") %>% dplyr::select(-Group, -PredPercent)
+
+dfTrainBB <- dfTrainAA %>%
+  mutate(Transported = ifelse(Transported=="True",1,0))
+
+boxplot(as.numeric(dfTrainBB$count), as.numeric(dfTrainBB$Transported))
+
+Group2a <- dfTest %>% dplyr::select(PassengerId) 
+
+Group2a$Group <- sub("\\_.*", "", Group2a$PassengerId)
+
+Group2aSum <- Group2a %>%
+  group_by(Group) %>%
+  summarize(count=n())
+
+dfTestA <- dfTest
+
+dfTestA$Group <- Group2a$Group
+
+dfTestAA <- inner_join(dfTestA, Group2aSum, by="Group") %>% dplyr::select(-Group)
+
+```
+
+```{r}
+dfTrain1 <- na.omit(dfTrainAA)
+dfTest1 <- EHPrepare_MissingValues_Imputation(dfTestAA, impute="median")
 ```
 
 
@@ -104,15 +148,11 @@ dfTrain2 <- dfTrain1 %>%
   dplyr::select(-Cabin) %>%
   mutate(Transported=ifelse(Transported=="True",1,0))
 
-#dfTrain2$Group <- sub("\\_.*", "", dfTrain2$PassengerId)
-
 dfTest1$Cabin1 <- substr(dfTest1$Cabin,1,1)
 dfTest1$Cabin2 <- str_sub(dfTest1$Cabin, - 1, - 1) 
 
 dfTest2 <- dfTest1 %>%
   dplyr::select(-Cabin)
-
-#dfTest2$Group <- sub("\\_.*", "", dfTest2$PassengerId)
 
 dfTrain3 <- dfTrain2
 dfTest3 <- dfTest2
@@ -164,37 +204,6 @@ dfTrain5Num <- dfTrain5 %>%
 
 ```
 
-```{r}
-Group2 <- dfTrain %>% dplyr::select(PassengerId, Transported)
-Group2 <- Group2 %>% mutate(Transported=ifelse(Transported=='True',1,0))
-
-Group2$Group <- sub("\\_.*", "", Group2$PassengerId)
-
-Group2Sum <- Group2 %>%
-  group_by(Group) %>%
-  summarize(PredPercent= sum(Transported)/n(), count=n())
-
-Group2SumGroups <- Group2Sum %>%
-  filter(count>1)
-
-hist(Group2SumGroups$PredPercent)
-
-Group2Sum$Determination <- ifelse(Group2Sum$PredPercent>.5, "True", ifelse(Group2Sum$PredPercent==.5, "None", "False"))
-
-new <- as.data.frame(lapply(result, function(x) Group2Sum$Determination[match(x, Group2Sum$Group)]))
-
-result2 <- cbind(result, "Determination"=new$Group)
-
-result3 <- result2 %>%
-  mutate(Transported = ifelse(Transported==1,"False","True")) %>%
-  mutate(Transported2 = ifelse(Determination=="None",Transported,Determination))  %>%
-  dplyr::select(PassengerID, Transported2) %>%
-  dplyr::rename(Transported=2)
-
-
-
-
-```
 
 
 ```{r}
@@ -450,24 +459,21 @@ library(caret)
 set.seed(0)
 
 dfTrain5$Transported = as.character(dfTrain5$Transported)
-dfTrain5a <- dfTrain5 %>%
-  mutate(Tot = VRDeck + ShoppingMall + Spa + RoomService + FoodCourt) %>%
-  dplyr::select(-Spa)
 
-dfTest5a <- dfTest5 %>%
-  mutate(Tot = VRDeck + ShoppingMall + Spa + RoomService + FoodCourt) %>%
-  dplyr::select(-Spa)
+dfTrain5$Group = ifelse(dfTrain5$count>1,1,0)
 
 train_x <- dfTrain5 %>%
-  dplyr::select(-Transported)
+  dplyr::select(-Transported, -count)
 train_y <- dfTrain5 %>%
   dplyr::select(Transported)
 
 dfTest6 <- dfTest5
 dfTest6$Transported = "1"
 
+dfTest6$Group = ifelse(dfTest6$count>1,1,0)
+
 test_x <- dfTest6 %>%
-  dplyr::select(-Transported,-PassengerID)
+  dplyr::select(-Transported,-PassengerID, -count)
 test_y <- dfTest6 %>%
   dplyr::select(Transported)
 
