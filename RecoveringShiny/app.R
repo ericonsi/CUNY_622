@@ -3,6 +3,7 @@ library(gridExtra)
 library(patchwork)
 library(tidyverse)
 library(rsconnect)
+library(Information)
 
 stepsx <- c("Step 1: Look for possible interaction candidates", "Step 2: Examine interactions", "Step 3: Run Regression")
 
@@ -276,7 +277,7 @@ server <- function(input, output) {
         
         
         if(input$cutoff != "") {
-            df$NewTerm = as.integer(ifelse(v2>as.integer(input$cutoff),1,0))
+            df$NewTerm = as.integer(ifelse(v2>as.numeric(input$cutoff),1,0))
         }
         
         df$target_column <- v1
@@ -304,7 +305,15 @@ server <- function(input, output) {
             interaction_term <- as.numeric(df[,input$inter])
             test_variable <- df[,input$vars[1]]
             
+            if(is.binary(target)) {
+            m <- glm(target ~ interaction_term*test_variable, data = df, family = "binomial")
+            } else {
             m <- lm(target ~ interaction_term*test_variable, df)
+        }
+            
+            print (paste("Target: ", input$target))
+            print (paste("Interaction Term: ", input$inter))
+            print (paste("Test Term: ", colnames(df[input$vars[1]])))
             x <- summary(m)
         }
         else {
