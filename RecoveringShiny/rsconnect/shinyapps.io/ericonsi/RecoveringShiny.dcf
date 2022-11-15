@@ -1,0 +1,13 @@
+name: RecoveringShiny
+title: RecoveringShiny
+username:
+account: ericonsi
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 7636627
+bundleId: 6517285
+url: https://ericonsi.shinyapps.io/RecoveringShiny/
+when: 1668537579.50556
+lastSyncTime: 1668537579.50559
+asMultiple: FALSE
+asStatic: FALSE

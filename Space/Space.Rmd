@@ -97,8 +97,8 @@ Group2 <- dfTrain %>% dplyr::select(PassengerId, Transported) %>% mutate(Transpo
 Group2$Group <- sub("\\_.*", "", Group2$PassengerId)
 
 Group2Sum <- Group2 %>%
-  group_by(Group) %>%
-  summarize(PredPercent= sum(Transported)/n(), count=n())
+  dplyr::group_by(Group) %>%
+  dplyr::summarize(PredPercent= sum(Transported)/n(), count=n())
 
 Group2SumGroups <- Group2Sum %>%
   filter(count>1)
@@ -122,8 +122,8 @@ Group2a <- dfTest %>% dplyr::select(PassengerId)
 Group2a$Group <- sub("\\_.*", "", Group2a$PassengerId)
 
 Group2aSum <- Group2a %>%
-  group_by(Group) %>%
-  summarize(count=n())
+  dplyr::group_by(Group) %>%
+  dplyr::summarize(count=n())
 
 dfTestA <- dfTest
 
@@ -353,26 +353,6 @@ c <- EHModel_Regression_Logistic(dfTrain5, "Transported", returnLM = TRUE)
 ```
 
 ```{r}
-
-set.seed(123)
-
-dfTrain6 <- dfTrain5 %>%
-  mutate(TotalSpend <- ShoppingMall + FoodCourt + Spa + VRDeck) %>%
-  dplyr::select(-ShoppingMall, -FoodCourt, -Spa, -VRDeck)
-
-dfTest6 <- dfTest5 %>%
-  mutate(TotalSpend <- ShoppingMall + FoodCourt + Spa + VRDeck) %>%
-  dplyr::select(-ShoppingMall, -FoodCourt, -Spa, -VRDeck)
-
-dfTrainSmall <- dfTrain5 %>%
-  dplyr::filter(row_number() %% 2 == 1)
-
-#qq <- EHModel_SVM(dfTrain5, "Transported", method="radial")
-
-#tc <- trainControl(method="cv", number=10)
-#metric <- "Accuracy"
-#rf <- train(Transported~., data=dfTrain5, method="rf", trControl = tc)
-
 svm2 <- train(Transported~., data=dfTrain5, method="svmLinear", preProcess = c("center","scale"))
 ```
 
@@ -458,19 +438,27 @@ library(caret)
 #make this example reproducible
 set.seed(0)
 
+dfTrain5q <-dfTrain5
+dfTest5q <- dfTest5
+
+dfTrain5q$Transported = as.character(dfTrain5q$Transported)
 dfTrain5$Transported = as.character(dfTrain5$Transported)
 
+dfTrain5q$Group = ifelse(dfTrain5q$count>1,1,0)
 dfTrain5$Group = ifelse(dfTrain5$count>1,1,0)
 
-train_x <- dfTrain5 %>%
+dfTrain5q$Inter_CountShop = dfTrain5q$count*dfTrain5q$ShoppingMall
+
+train_x <- dfTrain5q %>%
   dplyr::select(-Transported, -count)
-train_y <- dfTrain5 %>%
+train_y <- dfTrain5q %>%
   dplyr::select(Transported)
 
-dfTest6 <- dfTest5
+dfTest6 <- dfTest5q
 dfTest6$Transported = "1"
 
 dfTest6$Group = ifelse(dfTest6$count>1,1,0)
+dfTest6$Inter_CountShop = dfTest6$count*dfTest6$ShoppingMall
 
 test_x <- dfTest6 %>%
   dplyr::select(-Transported,-PassengerID, -count)
@@ -481,9 +469,9 @@ test_y <- dfTest6 %>%
 xgb_train <- xgb.DMatrix(data = as.matrix(train_x), label = as.matrix(train_y))
 xgb_test <- xgb.DMatrix(data = as.matrix(test_x), label = as.matrix(test_y))
 
-#tRIAL AND ERROR GAVE 55 AS BEST- COULD TRY OTHERS
+#tRIAL AND ERROR GAVE 55 AS BEST with max.depth at 3 - COULD TRY OTHERS
 
-model2 <- xgb.train(data = xgb_train, max.depth = 3, nrounds = 55)
+model2 <- xgb.train(data = xgb_train, max.depth = 100, nrounds = 10055)
 
 ```
 
@@ -499,7 +487,8 @@ colnames(predictions) <- c("PassengerID", "Transported")
 predictions <- predictions %>%
   mutate(Transported=ifelse(Transported>.5,'True','False'))
 
-write_csv(predictions, "C:\\Users\\Eric\\Desktop\\XGBpredictions1.csv")
+#write_csv(predictions, "C:\\Users\\Eric\\Desktop\\XGBpredictions1.csv")
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions1.csv")
 
 makePredictions2 <- function(model)
 {

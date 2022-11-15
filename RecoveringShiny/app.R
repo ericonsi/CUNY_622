@@ -235,7 +235,7 @@ server <- function(input, output) {
         })
         
         output$interSelection <- renderUI({
-            selectInput("inter", "Interaction Term:", choices = yy)
+            selectInput("inter", "Interaction Column:", choices = yy)
         })
         
         output$varsSelection <- renderUI({
@@ -277,7 +277,7 @@ server <- function(input, output) {
         
         
         if(input$cutoff != "") {
-            df$NewTerm = as.integer(ifelse(v2>as.numeric(input$cutoff),1,0))
+            df$Interaction_Column = as.integer(ifelse(v2>as.numeric(input$cutoff),1,0))
         }
         
         df$target_column <- v1
@@ -288,7 +288,7 @@ server <- function(input, output) {
                 wrap_plots(EHSummarize_StandardPlots(df, "target_column", return_list=TRUE), ncol=6)
             }
             else{
-                wrap_plots(EHExplore_Interactions_Scatterplots(df, "target_column", "NewTerm"))
+                wrap_plots(EHExplore_Interactions_Scatterplots(df, "target_column", "Interaction_Column"))
             }
         }
         else{
@@ -302,18 +302,18 @@ server <- function(input, output) {
             
             df <- read.csv(input$file)
             target <- df[,input$target]
-            interaction_term <- as.numeric(df[,input$inter])
-            test_variable <- df[,input$vars[1]]
+            interaction_column <- as.numeric(df[,input$inter])
+            test_column <- df[,input$vars[1]]
             
             if(is.binary(target)) {
-            m <- glm(target ~ interaction_term*test_variable, data = df, family = "binomial")
+            m <- glm(target ~ interaction_column*test_column, data = df, family = "binomial")
             } else {
-            m <- lm(target ~ interaction_term*test_variable, df)
+            m <- lm(target ~ interaction_column*test_column, df)
         }
             
             print (paste("Target: ", input$target))
-            print (paste("Interaction Term: ", input$inter))
-            print (paste("Test Term: ", colnames(df[input$vars[1]])))
+            print (paste("Interaction Column: ", input$inter))
+            print (paste("Test Column: ", colnames(df[input$vars[1]])))
             x <- summary(m)
         }
         else {
