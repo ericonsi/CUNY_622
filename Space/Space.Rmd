@@ -260,7 +260,7 @@ qq <- EHModel_RandomForest(dfTrain5, "Transported")
 
 ```{r}
 
- #BEST MODEL!!
+ #SECOND BEST MODEL!!
 library(gbm)
 boost=gbm(Transported ~ . ,data = dfTrain5, distribution = "gaussian",n.trees = 10000,
                   shrinkage = 0.01, interaction.depth = 4)
@@ -447,7 +447,8 @@ dfTrain5$Transported = as.character(dfTrain5$Transported)
 dfTrain5q$Group = ifelse(dfTrain5q$count>1,1,0)
 dfTrain5$Group = ifelse(dfTrain5$count>1,1,0)
 
-dfTrain5q$Inter_CountShop = dfTrain5q$count*dfTrain5q$ShoppingMall
+dfTrain5q$Inter_CountShop = dfTrain5q$Group*dfTrain5q$ShoppingMall
+#dfTrain5q$Inter_CountFood = dfTrain5q$Group*dfTrain5q$Age Gets worse for Age and Foodcourt
 
 train_x <- dfTrain5q %>%
   dplyr::select(-Transported, -count)
@@ -458,7 +459,8 @@ dfTest6 <- dfTest5q
 dfTest6$Transported = "1"
 
 dfTest6$Group = ifelse(dfTest6$count>1,1,0)
-dfTest6$Inter_CountShop = dfTest6$count*dfTest6$ShoppingMall
+dfTest6$Inter_CountShop = dfTest6$Group*dfTest6$ShoppingMall
+#dfTest6$Inter_CountFood = dfTest6$Group*dfTest6$Age  
 
 test_x <- dfTest6 %>%
   dplyr::select(-Transported,-PassengerID, -count)
@@ -470,8 +472,9 @@ xgb_train <- xgb.DMatrix(data = as.matrix(train_x), label = as.matrix(train_y))
 xgb_test <- xgb.DMatrix(data = as.matrix(test_x), label = as.matrix(test_y))
 
 #tRIAL AND ERROR GAVE 55 AS BEST with max.depth at 3 - COULD TRY OTHERS
+#depth of 1000 and nrounds 100000 showed no double descent
 
-model2 <- xgb.train(data = xgb_train, max.depth = 100, nrounds = 10055)
+model2 <- xgb.train(data = xgb_train, max.depth = 3, nrounds = 55)
 
 ```
 
@@ -488,7 +491,7 @@ predictions <- predictions %>%
   mutate(Transported=ifelse(Transported>.5,'True','False'))
 
 #write_csv(predictions, "C:\\Users\\Eric\\Desktop\\XGBpredictions1.csv")
-write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions1.csv")
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions2.csv")
 
 makePredictions2 <- function(model)
 {
