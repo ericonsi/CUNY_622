@@ -70,9 +70,11 @@ library(neuralnet)
 #dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\train.csv")
 #dfTest <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\test.csv")
 
-dfTrain <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\train.csv")
-dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
+#dfTrain <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\train.csv")
+#dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
 
+dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\train.csv")
+dfTest <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\test.csv")
 ```
 
 
@@ -86,6 +88,8 @@ dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
 
 summary(dfTrain)
 str(dfTrain)
+dfTrain %>%
+  count(dfTrain$Transported)
 ```
 
 ```{r}
@@ -189,6 +193,7 @@ EHExplore_Multicollinearity(dfNum)
 ```
 
 
+
 ```{r}
 
 dfTrain4 <- dfTrain3 %>%
@@ -209,6 +214,39 @@ dfTrain5Num <- dfTrain5 %>%
 
 ```
 
+```{r}
+q <- EHModel_Regression_Logistic(dfTrain5, "Transported", returnLM = TRUE)
+
+predictions <- predict(q,newdata=dfTest5)
+predictions <- data.frame(as.vector(predictions))
+predictions$PassengerId <- dfTest5$PassengerID
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("PassengerID", "Transported")
+
+predictions <- predictions %>%
+  mutate(Transported = ifelse(Transported>.5,"True","False"))
+
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\NNpredictions2.csv")
+
+makePredictions2 <- function(model)
+{
+predictions <- predict(model,newdata=dfTest5)
+predictions <- data.frame(as.vector(predictions))
+predictions$PassengerId <- dfTest5$PassengerID
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("PassengerID", "Transported")
+predictions <- predictions %>%
+  mutate(Transported = ifelse(Transported=="1", "True", "False"))
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\SVMpredictions2.csv")
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
+}
+
+#makePredictions2(a$rf)
+#makePredictions2(b$svm)
+#makePredictions2(c)
+
+
+```
 
 
 ```{r}
