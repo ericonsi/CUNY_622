@@ -58,6 +58,11 @@ library(lubridate)
 library(e1071)
 library(caTools)
 library(class)
+library(keras)
+library(mlbench)
+library(dplyr)
+library(magrittr)
+library(neuralnet)
 #library(mice)
 ```
 ```{r}
@@ -253,9 +258,9 @@ heatmap(qq, Rowv = NA, Colv = NA)
 
 ```{r}
 dfSmall <- dfTrain5 %>%
-  dplyr::filter(row_number() %% 10 ==1) 
+  dplyr::filter(row_number() %% 2 ==1) 
 
-qq <- EHModel_RandomForest(dfTrain5, "Transported")
+#qq <- EHModel_RandomForest(dfTrain5, "Transported")
 ```
 
 ```{r}
@@ -435,6 +440,8 @@ library(xgboost)
 library(caret)
 #BEST MODEL 221106-1123
 
+#need to scale?
+
 #make this example reproducible
 set.seed(0)
 
@@ -509,6 +516,184 @@ write_csv(predictions, "C:\\Users\\erico\\Desktop\\SVMpredictions2.csv")
 #makePredictions2(c)
 
 ```
+
+Neural network
+```{r}
+
+# https://www.r-bloggers.com/2021/04/deep-neural-network-in-r/
+
+#takes too long
+#n <- neuralnet(Transported ~ .,
+#              data = dfTrain5,
+#               hidden = c(12,7),
+#               linear.output = F,
+#               lifesign = 'full',
+#               rep=1)
+```
+```{r}
+#Needs above step
+
+#plot(n,col.hidden = 'darkgreen',     
+#col.hidden.synapse = 'darkgreen',
+#     show.weights = F,
+#     information = F,
+#     fill = 'lightblue')
+
+```
+```{r}
+
+data <- as.matrix(dfTrain5)
+dimnames(data) <- NULL
+
+```
+
+Partition
+```{r}
+set.seed(123)
+ind <- sample(2, nrow(data), replace = T, prob = c(.7, .3))
+training <- data[ind==1,1:13]
+test <- data[ind==2, 1:13]
+trainingtarget <- data[ind==1, 14]
+testtarget <- data[ind==2, 14]
+str(trainingtarget)
+
+```
+Scaling
+```{r}
+m <- colMeans(training)
+s <- apply(training, 2, sd)
+training <- scale(training, center = m, scale = s)
+test <- scale(test, center = m, scale = s)
+
+
+```
+```{r}
+
+dfTrain5z <- dfTrain5 %>% dplyr::select(-starts_with('cabin'))
+
+dfSmall2 <- dfSmall %>%
+  dplyr::select(-Cabin1_T)
+summary(dfSmall2)
+
+pca <- prcomp(dfSmall2, center = TRUE,scale. = TRUE)
+
+summary(pca)
+plot(pca)
+dfPCA <- as.data.frame(pca$x)
+dfPCA2 <- cbind(Transported = dfSmall$Transported, dfPCA)
+
+dfPCASmall <- dfPCA2 %>%
+  dplyr::select(PC1, PC2, PC3, PC4, Transported)
+
+dfSmallScaled <- EHPrepare_ScaleAllButTarget(dfSmall, "Transported")
+```
+
+```{r}
+
+library(neuralnet)
+set.seed(333)
+n <- neuralnet(Transported ~ .,
+               data = dfSmall,
+               hidden = 2,
+               err.fct = "ce",
+               linear.output = F,
+               lifesign = 'full',
+               rep = 2,
+               algorithm = "rprop+",
+               stepmax = 1000000, likelihood=TRUE, )
+
+```
+
+```{r}
+
+
+# plot our neural network 
+plot(n, rep = 1)
+
+```
+
+
+
+
+Model Creation
+```{r}
+
+model <- keras_model_sequential()
+model %>%
+         layer_dense(units = 5, activation = 'relu', input_shape = c(4)) %>%
+         layer_dense(units = 1)
+```
+
+Model Compilation and fitting
+```{r}
+model %>% compile(loss = 'mse',
+optimizer = 'rmsprop', 
+metrics = 'mae') 
+
+mymodel <- model %>%          
+fit(training,trainingtarget,
+             epochs = 100,
+             batch_size = 32,
+             validation_split = 0.2)
+
+
+```
+
+Prediction
+```{r}
+
+model %>% evaluate(test, testtarget)
+pred <- model %>% predict(test)
+
+mean((testtarget-pred)^2) 
+
+plot(testtarget, pred) 
+
+```
+Improve
+
+```{r}
+
+model %>%
+         layer_dense(units = 100, activation = 'relu', input_shape = c(13)) %>%
+        layer_dropout(rate=0.4)  %>%
+        layer_dense(units = 50, activation = 'relu')  %>%
+        layer_dropout(rate=0.2)  %>%
+         layer_dense(units = 1)
+
+```
+
+
+```{r}
+
+predictions <- predict(n,newdata=dfTest5)
+predictions <- data.frame(as.vector(predictions))
+predictions$PassengerId <- dfTest5$PassengerID
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("PassengerID", "Transported")
+
+predictions <- predictions %>%
+  mutate(Transported = ifelse(Transported>.5,"True","False"))
+
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\NNpredictions2.csv")
+
+makePredictions2 <- function(model)
+{
+predictions <- predict(model,newdata=dfTest5)
+predictions <- data.frame(as.vector(predictions))
+predictions$PassengerId <- dfTest5$PassengerID
+predictions[,c(1,2)] <- predictions[,c(2,1)]
+colnames(predictions) <- c("PassengerID", "Transported")
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\SVMpredictions2.csv")
+#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
+}
+
+#makePredictions2(a$rf)
+#makePredictions2(b$svm)
+#makePredictions2(c)
+
+```
+
 
 
 
