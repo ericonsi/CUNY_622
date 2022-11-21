@@ -251,6 +251,12 @@ write_csv(predictions, "C:\\Users\\erico\\Desktop\\SVMpredictions2.csv")
 
 ```{r}
 
+EHModel_RandomForest(dfTrain5, "Transported")
+```
+
+
+```{r}
+
 
 pca <- prcomp(dfNum, center = TRUE,scale. = TRUE)
 
