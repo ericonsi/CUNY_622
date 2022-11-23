@@ -65,6 +65,7 @@ library(magrittr)
 library(neuralnet)
 #library(mice)
 ```
+
 ```{r}
 
 #dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\train.csv")
@@ -98,6 +99,8 @@ dfTrain %>%
 summary(dfTest)
 
 ```
+
+### Create Groups
 
 ```{r}
 
@@ -142,11 +145,14 @@ dfTestAA <- inner_join(dfTestA, Group2aSum, by="Group") %>% dplyr::select(-Group
 
 ```
 
+### Missing Variables
+
 ```{r}
 dfTrain1 <- na.omit(dfTrainAA)
 dfTest1 <- EHPrepare_MissingValues_Imputation(dfTestAA, impute="median")
 ```
 
+### Work With Cabin
 
 ```{r}
 library(stringr)
@@ -167,7 +173,7 @@ dfTrain3 <- dfTrain2
 dfTest3 <- dfTest2
 ```
 
-
+### Look at Distributions
 
 
 ```{r}
@@ -183,6 +189,8 @@ EHSummarize_StandardPlots(dfTrain3, "Transported")
 
 ```
 
+### Look at Multicollinearity
+
 ```{r}
 
 dfNum <- dfTrain %>%
@@ -192,7 +200,7 @@ dfNum <- na.omit(dfNum)
 EHExplore_Multicollinearity(dfNum)
 ```
 
-
+### Create Dummy Variables
 
 ```{r}
 
@@ -214,6 +222,9 @@ dfTrain5Num <- dfTrain5 %>%
 
 ```
 
+
+### Perform Logistic Regression
+
 ```{r}
 q <- EHModel_Regression_Logistic(dfTrain5, "Transported", returnLM = TRUE)
 
@@ -228,32 +239,17 @@ predictions <- predictions %>%
 
 write_csv(predictions, "C:\\Users\\erico\\Desktop\\NNpredictions2.csv")
 
-makePredictions2 <- function(model)
-{
-predictions <- predict(model,newdata=dfTest5)
-predictions <- data.frame(as.vector(predictions))
-predictions$PassengerId <- dfTest5$PassengerID
-predictions[,c(1,2)] <- predictions[,c(2,1)]
-colnames(predictions) <- c("PassengerID", "Transported")
-predictions <- predictions %>%
-  mutate(Transported = ifelse(Transported=="1", "True", "False"))
-write_csv(predictions, "C:\\Users\\erico\\Desktop\\SVMpredictions2.csv")
-#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
-}
-
-#makePredictions2(a$rf)
-#makePredictions2(b$svm)
-#makePredictions2(c)
-
 
 ```
 
+### Perform Random Forest
 
 ```{r}
 
 EHModel_RandomForest(dfTrain5, "Transported")
 ```
 
+### Perform PCA
 
 ```{r}
 
@@ -265,6 +261,9 @@ summary(pca)
 
 ```
 
+
+
+
 ```{r}
 
 #install_github("vqv/ggbiplot")
@@ -272,6 +271,8 @@ library(ggbiplot)
 ggbiplot(pca, labels=dfx1$HomePlanet)
 
 ```
+
+### Perfomr K-Means
 
 ```{r}
 
@@ -299,13 +300,15 @@ heatmap(qq, Rowv = NA, Colv = NA)
 #EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfNumC, "Cluster")
 ```
 
+### Create a smaller database
+
 
 ```{r}
 dfSmall <- dfTrain5 %>%
   dplyr::filter(row_number() %% 2 ==1) 
-
-#qq <- EHModel_RandomForest(dfTrain5, "Transported")
 ```
+
+### Perform GBM
 
 ```{r}
 
@@ -330,76 +333,7 @@ write_csv(result, "C:\\Users\\Eric\\Desktop\\SVMpredictions5.csv")
 
 ```
 
-
-```{r}
-
-ww <- EHModel_Regression_Logistic(dfTrain5, 'Transported',returnLM = TRUE)
-ww4 <- glm(Transported ~., data = dfTrain5, family = binomial(link = "logit"))
-
-
-predictions2 <- as.data.frame(predict(ww4, dfTest5)) %>%
-  rename(Transported = 1) 
-
-result <- as.data.frame(cbind(dfTest5$PassengerID, predictions2$Transported)) %>%
-  rename(PassengerID = 1, Transported=2)   %>%
-  mutate(Transported = ifelse(Transported>.5,'True','False'))
-
-write_csv(result, "C:\\Users\\Eric\\Desktop\\SVMpredictions5.csv")
-
-```
-
-
-
-```{r}
-
-predictions2 <- as.data.frame(predict(qq$rf, dfTest5)) %>%
-  rename(Transported = 1) 
-
-
-#dfTest2$Group <- sub("\\_.*", "", dfTest2$PassengerId)
-
-result <- as.data.frame(cbind(dfTest5$PassengerID, predictions2$Transported)) %>%
-  rename(PassengerID = 1, Transported=2) 
-
-dfGroups <- result
-dfGroups$Group <- sub("\\_.*", "", result$PassengerID)
-result$Group <- sub("\\_.*", "", result$PassengerID)
-dfGroups$Transported = as.numeric(dfGroups$Transported)
-dfGroups$Transported = ifelse(dfGroups$Transported==1,0,1)
-
-dfGroupsSum <- dfGroups %>%
-  group_by(Group) %>%
-  summarize(PredPercent= sum(Transported)/n())
-
-dfGroupsSum$Determination <- ifelse(dfGroupsSum$PredPercent>.5, "True", ifelse(dfGroupsSum$PredPercent==.5, "None", "False"))
-
-new <- as.data.frame(lapply(result, function(x) dfGroupsSum$Determination[match(x, dfGroupsSum$Group)]))
-
-result2 <- cbind(result, "Determination"=new$Group)
-
-result3 <- result2 %>%
-  mutate(Transported = ifelse(Transported==1,"False","True")) %>%
-  mutate(Transported2 = ifelse(Determination=="None",Transported,Determination))  %>%
-  dplyr::select(PassengerID, Transported2) %>%
-  dplyr::rename(Transported=2)
-
-
-
-
-#  mutate(Transported = ifelse(Transported==1,'False','True'))
-
-
-
-write_csv(result3, "C:\\Users\\Eric\\Desktop\\SVMpredictions4.csv")
-
-```
-
-```{r}
-
-#b <- EHModel_SVM(dfx2RFSmall, "Transported", method="radial")
-c <- EHModel_Regression_Logistic(dfTrain5, "Transported", returnLM = TRUE)
-
-```
+### Perform SVM
 
 ```{r}
 svm2 <- train(Transported~., data=dfTrain5, method="svmLinear", preProcess = c("center","scale"))
@@ -425,36 +359,6 @@ write_csv(result, "C:\\Users\\Eric\\Desktop\\SVMpredictions2.csv")
 ```
 
 
-
-```{r}
-
-rf1 <-train(Transported~., data=dfTrain5, method="rf")
- 
-
-model = rf1
-predictions <- predict(model,newdata=dfTest5)
-predictions <- data.frame(as.vector(predictions))
-predictions$PassengerId <- dfTest5$PassengerID
-predictions[,c(1,2)] <- predictions[,c(2,1)]
-colnames(predictions) <- c("PassengerID", "Transported")
-write_csv(predictions, "C:\\Users\\erico\\Desktop\\SVMpredictions2.csv")
-
-makePredictions2 <- function(model)
-{
-predictions <- predict(model,newdata=dfTest5)
-predictions <- data.frame(as.vector(predictions))
-predictions$PassengerId <- dfTest5$PassengerID
-predictions[,c(1,2)] <- predictions[,c(2,1)]
-colnames(predictions) <- c("PassengerID", "Transported")
-write_csv(predictions, "C:\\Users\\erico\\Desktop\\SVMpredictions2.csv")
-#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
-}
-
-#makePredictions2(a$rf)
-#makePredictions2(b$svm)
-#makePredictions2(c)
-
-```
 ```{r}
 
 #x <- predict(a$rf, dfTest5)
@@ -543,21 +447,6 @@ predictions <- predictions %>%
 
 #write_csv(predictions, "C:\\Users\\Eric\\Desktop\\XGBpredictions1.csv")
 write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions2.csv")
-
-makePredictions2 <- function(model)
-{
-predictions <- predict(model,newdata=dfTest5)
-predictions <- data.frame(as.vector(predictions))
-predictions$PassengerId <- dfTest5$PassengerID
-predictions[,c(1,2)] <- predictions[,c(2,1)]
-colnames(predictions) <- c("PassengerID", "Transported")
-write_csv(predictions, "C:\\Users\\erico\\Desktop\\SVMpredictions2.csv")
-#write_csv(predictions, "D:\\RStudio\\CUNY_621\\Final\\predictionsABC.csv")
-}
-
-#makePredictions2(a$rf)
-#makePredictions2(b$svm)
-#makePredictions2(c)
 
 ```
 
@@ -707,6 +596,11 @@ model %>%
 
 ```
 
+```{r}
+
+a <- EHModel_Predict(n, dfTest5, "PassengerID",,"C:\\Users\\erico\\Desktop\\NNpredictions5.csv")
+
+```
 
 ```{r}
 
