@@ -71,11 +71,11 @@ library(neuralnet)
 #dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\train.csv")
 #dfTest <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\test.csv")
 
-#dfTrain <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\train.csv")
-#dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
+dfTrain <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\train.csv")
+dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
 
-dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\train.csv")
-dfTest <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\test.csv")
+#dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\train.csv")
+#dfTest <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\test.csv")
 ```
 
 
@@ -110,7 +110,7 @@ Group2$Group <- sub("\\_.*", "", Group2$PassengerId)
 
 Group2Sum <- Group2 %>%
   dplyr::group_by(Group) %>%
-  dplyr::summarize(PredPercent= sum(Transported)/n(), count=n())
+  dplyr::summarize(PredPercent= sum(Transported)/dplyr::n(), count=dplyr::n())
 
 Group2SumGroups <- Group2Sum %>%
   filter(count>1)
@@ -135,7 +135,7 @@ Group2a$Group <- sub("\\_.*", "", Group2a$PassengerId)
 
 Group2aSum <- Group2a %>%
   dplyr::group_by(Group) %>%
-  dplyr::summarize(count=n())
+  dplyr::summarize(count=dplyr::n())
 
 dfTestA <- dfTest
 
@@ -227,26 +227,20 @@ dfTrain5Num <- dfTrain5 %>%
 
 ```{r}
 q <- EHModel_Regression_Logistic(dfTrain5, "Transported", returnLM = TRUE)
-
-predictions <- predict(q,newdata=dfTest5)
-predictions <- data.frame(as.vector(predictions))
-predictions$PassengerId <- dfTest5$PassengerID
-predictions[,c(1,2)] <- predictions[,c(2,1)]
-colnames(predictions) <- c("PassengerID", "Transported")
-
-predictions <- predictions %>%
-  mutate(Transported = ifelse(Transported>.5,"True","False"))
-
-write_csv(predictions, "C:\\Users\\erico\\Desktop\\NNpredictions2.csv")
-
-
+predictions_logistic <- EHModel_Predict(q, dfTest5, threshold=.5, testData_IDColumn = "PassengerID")
 ```
 
 ### Perform Random Forest
 
 ```{r}
+dfSmall <- dfTrain5 %>%
+  dplyr::filter(row_number() %% 15 ==1) 
 
-EHModel_RandomForest(dfTrain5, "Transported")
+a <- EHModel_RandomForest(dfSmall, "Transported")
+predictions_rf <- EHModel_Predict(a$rf, dfTest5, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+
+predictions_rf$Transported <- ifelse(predictions_rf$Transported==1,"True","False")
+write_csv(predictions_rf, "C://Users//eric.hirsch//Desktop//RF1.csv")
 ```
 
 ### Perform PCA
@@ -336,42 +330,15 @@ write_csv(result, "C:\\Users\\Eric\\Desktop\\SVMpredictions5.csv")
 ### Perform SVM
 
 ```{r}
-svm2 <- train(Transported~., data=dfTrain5, method="svmLinear", preProcess = c("center","scale"))
+svm2 <- EHModel_SVM(dfTrain5, "Transported", method="poly")
+
+predictions_svm <- EHModel_Predict(svm2$svm, dfTest5, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+
+predictions_svm$Transported <- ifelse(predictions_svm$Transported==1,"True","False")
+write_csv(predictions_svm, "C://Users//eric.hirsch//Desktop//SVMPoly.csv")
 ```
 
-```{r}
-
-predictions2 <- as.data.frame(predict(svm2, dfTest5)) %>%
-  rename(Transported = 1) %>%
-  mutate(Transported =ifelse(Transported>.5,1,0))
-
-
-result <- as.data.frame(cbind(dfTest5$PassengerID, predictions2$Transported)) %>%
-  rename(PassengerID = 1, Transported=2) %>%
-  mutate(Transported = ifelse(Transported==1,'True','False'))
-
-
-
-write_csv(result, "C:\\Users\\Eric\\Desktop\\SVMpredictions2.csv")
-
-
-
-```
-
-
-```{r}
-
-#x <- predict(a$rf, dfTest5)
-x <- as.data.frame(x)
-
-```
-
-```{r}
-dfx3Small <- dfx3 %>%
-  filter(row_number() %% 5 ==1)
-
-EHModel_SVM(dfx3Small, "Transported", method="poly")
-```
+Perfomr K means
 
 ```{r}
 library(factoextra)
@@ -382,7 +349,7 @@ k2 <- kmeans(dfNum, centers=3, iter.max = 10, nstart = 1)
 fviz_cluster(k2, data = dfNum)
 ```
 
-
+Perform XGBoost
 ```{r}
 library(xgboost)
 library(caret)
@@ -431,10 +398,11 @@ xgb_test <- xgb.DMatrix(data = as.matrix(test_x), label = as.matrix(test_y))
 
 model2 <- xgb.train(data = xgb_train, max.depth = 3, nrounds = 55)
 
+#predictions_XGBoost <- EHModel_Predict(model2, xgb_test, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+
 ```
 
 ```{r}
-
 
 predictions <- predict(model2,newdata=xgb_test)
 predictions <- data.frame(as.vector(predictions)) 
@@ -524,7 +492,7 @@ dfSmallScaled <- EHPrepare_ScaleAllButTarget(dfSmall, "Transported")
 ```{r}
 
 library(neuralnet)
-set.seed(333)
+set.seed(42760)
 n <- neuralnet(Transported ~ .,
                data = dfSmall,
                hidden = 2,
@@ -539,66 +507,18 @@ n <- neuralnet(Transported ~ .,
 
 ```{r}
 
-
-# plot our neural network 
 plot(n, rep = 1)
 
 ```
 
 
 
-
-Model Creation
 ```{r}
 
-model <- keras_model_sequential()
-model %>%
-         layer_dense(units = 5, activation = 'relu', input_shape = c(4)) %>%
-         layer_dense(units = 1)
-```
+predictions_nn <- EHModel_Predict(n, dfTest5, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
-Model Compilation and fitting
-```{r}
-model %>% compile(loss = 'mse',
-optimizer = 'rmsprop', 
-metrics = 'mae') 
-
-mymodel <- model %>%          
-fit(training,trainingtarget,
-             epochs = 100,
-             batch_size = 32,
-             validation_split = 0.2)
-
-
-```
-
-Prediction
-```{r}
-
-model %>% evaluate(test, testtarget)
-pred <- model %>% predict(test)
-
-mean((testtarget-pred)^2) 
-
-plot(testtarget, pred) 
-
-```
-Improve
-
-```{r}
-
-model %>%
-         layer_dense(units = 100, activation = 'relu', input_shape = c(13)) %>%
-        layer_dropout(rate=0.4)  %>%
-        layer_dense(units = 50, activation = 'relu')  %>%
-        layer_dropout(rate=0.2)  %>%
-         layer_dense(units = 1)
-
-```
-
-```{r}
-
-a <- EHModel_Predict(n, dfTest5, "PassengerID",,"C:\\Users\\erico\\Desktop\\NNpredictions5.csv")
+predictions_nn$Transported <- ifelse(predictions_nn$Transported==1,"True","False")
+write_csv(predictions_nn, "C://Users//eric.hirsch//Desktop//NN.csv")
 
 ```
 
