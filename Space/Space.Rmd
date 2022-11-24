@@ -226,8 +226,30 @@ dfTrain5Num <- dfTrain5 %>%
 ### Perform Logistic Regression
 
 ```{r}
-q <- EHModel_Regression_Logistic(dfTrain5, "Transported", returnLM = TRUE)
-predictions_logistic <- EHModel_Predict(q, dfTest5, threshold=.5, testData_IDColumn = "PassengerID")
+dfTrain5z <- dfTrain5
+dfTrain5z$Group = ifelse(dfTrain5z$count>1,1,0)
+
+dfTrain5z$Inter_CountShop = dfTrain5z$Group*dfTrain5z$ShoppingMall
+dfTrain5z$Inter_CountAge = dfTrain5z$Group*dfTrain5z$Age #Gets worse for Age and Foodcourt
+
+dfTrain5zz <- dfTrain5z %>%
+  dplyr::select(-count)
+
+dfTest5z <- dfTest5
+dfTest5z$Group = ifelse(dfTest5z$count>1,1,0)
+
+dfTest5z$Inter_CountShop = dfTest5z$Group*dfTest5z$ShoppingMall
+dfTest5z$Inter_CountAge = dfTest5z$Group*dfTest5z$Age #Gets worse for Age and Foodcourt
+
+dfTest5zz <- dfTest5z %>%
+  dplyr::select(-count)
+
+q <- EHModel_Regression_Logistic(dfTrain5zz, "Transported", returnLM = TRUE)
+predictions_logistic <- EHModel_Predict(q, dfTest5zz, threshold=.5, testData_IDColumn = "PassengerID", predictionsColumnName = "Transported")
+
+predictions_logistic$Transported <- ifelse(predictions_logistic$Transported==1,"True","False")
+write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_WithFeatures.csv")
+
 ```
 
 ### Perform Random Forest
@@ -349,7 +371,7 @@ k2 <- kmeans(dfNum, centers=3, iter.max = 10, nstart = 1)
 fviz_cluster(k2, data = dfNum)
 ```
 
-Perform XGBoost
+Perform XGBoost - also does some feature engineering
 ```{r}
 library(xgboost)
 library(caret)
