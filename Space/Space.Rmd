@@ -1,5 +1,5 @@
 ---
-title: "Eric_Hirsch_622_Assignment_1"
+title: "Eric_Hirsch_622_Final_Assignment"
 subtitle: "Predicting Sales Data" 
 author: "Eric Hirsch"
 date: "10/7/2022"
@@ -93,14 +93,107 @@ dfTrain %>%
   count(dfTrain$Transported)
 ```
 
+
+### Look at Distributions
+
+
 ```{r}
 
 
-summary(dfTest)
+a <- EHSummarize_SingleColumn_Histograms(dfTrain3)
+grid.arrange(grobs=a[c(1:6)], ncol=3)
+
+EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfTrain3, "Transported")
+#grid.arrange(grobs=b[c(1:8)], ncol=1)
+
+EHSummarize_StandardPlots(dfTrain3, "Transported")
 
 ```
 
-### Create Groups
+### Look at Multicollinearity
+
+```{r}
+
+dfNum <- dfTrain %>%
+  dplyr::select(where(is.numeric)) 
+dfNum <- na.omit(dfNum)
+
+EHExplore_Multicollinearity(dfNum)
+```
+
+### Look at Missing Values
+
+```{r}
+
+EHSummarize_MissingValues(dfTrain)
+
+dfMissingRecordsFlagAny <- dfTrain %>%
+    mutate(Flag=ifelse(rowSums(is.na(dfTrain)) > 0, 1, 0)) %>%
+    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
+    dplyr::select(Transported, Flag)
+
+dfMissingRecordsFlag_RoomService <- dfTrain %>%
+    mutate(RoomServiceFlag=ifelse(is.na(dfTrain$RoomService) > 0, 1, 0)) %>%
+    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
+      dplyr::select(Transported, RoomServiceFlag)
+
+
+dfMissingRecordsFlag_VRDeck <- dfTrain %>%
+    mutate(VRDeckFlag=ifelse(is.na(dfTrain$VRDeck) > 0, 1, 0)) %>%
+    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
+      dplyr::select(Transported, VRDeckFlag)
+
+
+dfMissingRecordsFlag_SPA <- dfTrain %>%
+    mutate(SpaFlag=ifelse(is.na(dfTrain$Spa) > 0, 1, 0)) %>%
+    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
+      dplyr::select(Transported, SpaFlag)
+
+
+dfMissingRecordsFlag_ShoppingMall <- dfTrain %>%
+    mutate(ShoppingMallFlag=ifelse(is.na(dfTrain$ShoppingMall) > 0, 1, 0)) %>%
+    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
+      dplyr::select(Transported, ShoppingMallFlag)
+
+
+dfMissingRecordsFlag_FoodCourt <- dfTrain %>%
+    mutate(FoodCourtFlag=ifelse(is.na(dfTrain$FoodCourt) > 0, 1, 0)) %>%
+    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
+      dplyr::select(Transported, FoodCourtFlag)
+
+print(chisq.test(table(dfMissingRecordsFlagAny)))
+print(chisq.test(table(dfMissingRecordsFlag_SPA)))
+print(chisq.test(table(dfMissingRecordsFlag_FoodCourt)))
+print(chisq.test(table(dfMissingRecordsFlag_VRDeck)))
+print(chisq.test(table(dfMissingRecordsFlag_ShoppingMall)))
+print(chisq.test(table(dfMissingRecordsFlag_RoomService)))
+
+```
+
+### First Pass: Logistic regression
+
+```{r}
+
+
+dfTrainNum <- dfTrain %>%
+  mutate(Transported=ifelse(Transported=='True',1,0)) %>%
+  dplyr::select(where(is.numeric)) 
+
+dfTestNum <- dfTest %>%
+  dplyr::select(where(is.numeric))
+
+dfTestNum <- cbind(dfTestNum, "PassengerID" = dfTest$PassengerId)
+
+q <- EHModel_Regression_Logistic(dfTrainNum, "Transported", returnLM = TRUE)
+
+predictions_logistic <- EHModel_Predict(q, dfTestNum, threshold=.5, testData_IDColumn = "PassengerID", predictionsColumnName = "Transported")
+
+predictions_logistic$Transported <- ifelse(predictions_logistic$Transported==1,"True","False")
+write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_FirstPass.csv")
+
+```
+### Data Preparation and Feature Engineering
+### 1. Create Groups needs to be done before missing values correction since it counts group members
 
 ```{r}
 
@@ -145,19 +238,22 @@ dfTestAA <- inner_join(dfTestA, Group2aSum, by="Group") %>% dplyr::select(-Group
 
 ```
 
-### Missing Variables
+### Handle Missing Variables
 
 ```{r}
 dfTrain1 <- na.omit(dfTrainAA)
+#dfTrain1 <- EHPrepare_MissingValues_Imputation(dfTrainAA, impute="median")
 dfTest1 <- EHPrepare_MissingValues_Imputation(dfTestAA, impute="median")
+
 ```
 
-### Work With Cabin
+### Create Cabin variables
 
 ```{r}
 library(stringr)
 dfTrain1$Cabin1 <- substr(dfTrain1$Cabin,1,1)
 dfTrain1$Cabin2 <- str_sub(dfTrain1$Cabin, - 1, - 1) 
+#dfTrain1$Cabin3 <- as.numeric(gsub(".*?([0-9]+).*", "\\1", dfTrain1$Cabin))
 
 dfTrain2 <- dfTrain1 %>%
   dplyr::select(-Cabin) %>%
@@ -165,6 +261,7 @@ dfTrain2 <- dfTrain1 %>%
 
 dfTest1$Cabin1 <- substr(dfTest1$Cabin,1,1)
 dfTest1$Cabin2 <- str_sub(dfTest1$Cabin, - 1, - 1) 
+#dfTest1$Cabin3 <- as.numeric(gsub(".*?([0-9]+).*", "\\1", dfTest1$Cabin))
 
 dfTest2 <- dfTest1 %>%
   dplyr::select(-Cabin)
@@ -173,32 +270,7 @@ dfTrain3 <- dfTrain2
 dfTest3 <- dfTest2
 ```
 
-### Look at Distributions
 
-
-```{r}
-
-
-a <- EHSummarize_SingleColumn_Histograms(dfTrain3)
-grid.arrange(grobs=a[c(1:6)], ncol=3)
-
-EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfTrain3, "Transported")
-#grid.arrange(grobs=b[c(1:8)], ncol=1)
-
-EHSummarize_StandardPlots(dfTrain3, "Transported")
-
-```
-
-### Look at Multicollinearity
-
-```{r}
-
-dfNum <- dfTrain %>%
-  dplyr::select(where(is.numeric)) 
-dfNum <- na.omit(dfNum)
-
-EHExplore_Multicollinearity(dfNum)
-```
 
 ### Create Dummy Variables
 
@@ -233,7 +305,7 @@ dfTrain5z$Inter_CountShop = dfTrain5z$Group*dfTrain5z$ShoppingMall
 dfTrain5z$Inter_CountAge = dfTrain5z$Group*dfTrain5z$Age #Gets worse for Age and Foodcourt
 
 dfTrain5zz <- dfTrain5z %>%
-  dplyr::select(-count)
+  dplyr::select(-count, -Cabin3)
 
 dfTest5z <- dfTest5
 dfTest5z$Group = ifelse(dfTest5z$count>1,1,0)
@@ -252,39 +324,42 @@ write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_WithFeatures.csv"
 
 ```
 
+### Perform PCA
+
+```{r}
+
+
+pca <- prcomp(dfTrain5zz, center = TRUE,scale. = TRUE)
+
+summary(pca)
+plot(pca)
+
+
+```
+
+
+
 ### Perform Random Forest
 
 ```{r}
 dfSmall <- dfTrain5 %>%
   dplyr::filter(row_number() %% 15 ==1) 
 
-a <- EHModel_RandomForest(dfSmall, "Transported")
-predictions_rf <- EHModel_Predict(a$rf, dfTest5, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+#a <- EHModel_RandomForest(dfTrain5zz, "Transported")  #RESTORE
+predictions_rf <- EHModel_Predict(a$rf, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
 predictions_rf$Transported <- ifelse(predictions_rf$Transported==1,"True","False")
-write_csv(predictions_rf, "C://Users//eric.hirsch//Desktop//RF1.csv")
-```
-
-### Perform PCA
-
-```{r}
-
-
-pca <- prcomp(dfNum, center = TRUE,scale. = TRUE)
-
-summary(pca)
-
-
+write_csv(predictions_rf, "C://Users//erico//Desktop//RF1.csv")
 ```
 
 
-
+Didn't Do This:
 
 ```{r}
 
 #install_github("vqv/ggbiplot")
-library(ggbiplot)
-ggbiplot(pca, labels=dfx1$HomePlanet)
+#library(ggbiplot)
+#ggbiplot(pca, labels=dfx1$HomePlanet)
 
 ```
 
@@ -295,9 +370,10 @@ ggbiplot(pca, labels=dfx1$HomePlanet)
 
 library(factoextra)
 
-fviz_nbclust(dfNum, kmeans, method = "wss")
-k2 <- kmeans(dfNum, centers=6, iter.max = 10, nstart = 1)
-fviz_cluster(k2, data = dfNum)
+#fviz_nbclust(dfTrain5zz, kmeans, method = "wss") #RESTORE
+
+k2 <- kmeans(dfTrain5zz, centers=9, iter.max = 10, nstart = 1)
+fviz_cluster(k2, data = dfTrain5zz)
 ```
 
 ```{r}
@@ -352,12 +428,12 @@ write_csv(result, "C:\\Users\\Eric\\Desktop\\SVMpredictions5.csv")
 ### Perform SVM
 
 ```{r}
-svm2 <- EHModel_SVM(dfTrain5, "Transported", method="poly")
+#svm2 <- EHModel_SVM(dfTrain5zz, "Transported", method="poly") #RESTORE
 
-predictions_svm <- EHModel_Predict(svm2$svm, dfTest5, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+predictions_svm <- EHModel_Predict(svm2$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
 predictions_svm$Transported <- ifelse(predictions_svm$Transported==1,"True","False")
-write_csv(predictions_svm, "C://Users//eric.hirsch//Desktop//SVMPoly.csv")
+write_csv(predictions_svm, "C://Users//erico//Desktop//SVMPoly.csv")
 ```
 
 Perfomr K means
@@ -415,18 +491,38 @@ test_y <- dfTest6 %>%
 xgb_train <- xgb.DMatrix(data = as.matrix(train_x), label = as.matrix(train_y))
 xgb_test <- xgb.DMatrix(data = as.matrix(test_x), label = as.matrix(test_y))
 
-#tRIAL AND ERROR GAVE 55 AS BEST with max.depth at 3 - COULD TRY OTHERS
+#tRIAL AND ERROR GAVE 56 AS BEST with max.depth at 3 - COULD TRY OTHERS
 #depth of 1000 and nrounds 100000 showed no double descent
 
-model2 <- xgb.train(data = xgb_train, max.depth = 3, nrounds = 55)
+model2 <- xgb.train(data = xgb_train, max.depth = 3, nrounds = 13)
 
 #predictions_XGBoost <- EHModel_Predict(model2, xgb_test, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+
+set.seed(100)
+cv <- xgb.cv(data = xgb_train, nrounds = 100, nthread = 2, nfold = 10, metrics = list("rmse","auc"),
+                  max_depth = 3, eta = 1, objective = "binary:logistic")
+print(cv)
+print(cv, verbose=TRUE)
+
+# Check which round was the best iteration (the one that initiated the early stopping)
+print(cv$best_iteration)
+
+# Get the predictions
+head(cv$pred)
+
+# Train a model using 3 rounds (corresponds to best iteration)
+trained_model <- xgb.train(data = xgb_train, max_depth = 3,
+              eta = 1, nthread = 4, nrounds = 14,
+              watchlist = list(train = xgb_train, eval = xgb_test),
+              objective = "binary:logistic")
+# Get predictions
+head(predict(trained_model, xgb_train))
 
 ```
 
 ```{r}
 
-predictions <- predict(model2,newdata=xgb_test)
+predictions <- predict(trained_model,newdata=xgb_test)
 predictions <- data.frame(as.vector(predictions)) 
 predictions$PassengerId <- dfTest5$PassengerID
 predictions[,c(1,2)] <- predictions[,c(2,1)]
@@ -436,7 +532,7 @@ predictions <- predictions %>%
   mutate(Transported=ifelse(Transported>.5,'True','False'))
 
 #write_csv(predictions, "C:\\Users\\Eric\\Desktop\\XGBpredictions1.csv")
-write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions2.csv")
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds14.csv")
 
 ```
 
