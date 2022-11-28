@@ -616,6 +616,165 @@ dfPCASmall <- dfPCA2 %>%
 dfSmallScaled <- EHPrepare_ScaleAllButTarget(dfSmall, "Transported")
 ```
 
+
+
+```{r}
+library(doParallel)
+
+cl<-makePSOCKcluster(7)
+  
+registerDoParallel(cl)
+  
+start.time<-proc.time()
+  
+  rad <- EHModel_SVM(dfTrain5zz, "Transported", method="radial")
+  
+stop.time<-proc.time()
+  
+run.time<-stop.time -start.time
+  
+print(run.time)
+  
+stopCluster(cl)
+
+```
+
+```{r}
+predictions_rad <- EHModel_Predict(rad$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+
+predictions_rad$Transported <- ifelse(predictions_rad$Transported==1,"True","False")
+write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_Rad.csv")
+
+```
+
+
+
+```{r}
+
+getPrimeNumbers <- function(n) {  
+   n <- as.integer(n)
+   if(n > 1e6) stop("n too large")
+   primes <- rep(TRUE, n)
+   primes[1] <- FALSE
+   last.prime <- 2L
+   for(i in last.prime:floor(sqrt(n)))
+   {
+      primes[seq.int(2L*last.prime, n, last.prime)] <- FALSE
+      last.prime <- last.prime + min(which(primes[(last.prime+1):n]))
+   }
+   which(primes)
+}
+
+library(doParallel)  
+no_cores <- detectCores() - 2  
+registerDoParallel(cores=no_cores)  
+cl <- makeCluster(no_cores)  
+result <- parLapply(cl, 10:1000000, getPrimeNumbers)  
+stopCluster(cl)  
+
+
+```
+
+
+```{r}
+library(doParallel)
+
+cl<-makePSOCKcluster(7)
+  
+registerDoParallel(cl)
+  
+start.time<-proc.time()
+  
+nets <- function() {
+  neuralnet(Transported ~ .,
+               data = dfTrain5zz,
+               hidden = 1,
+               err.fct = "ce",
+               linear.output = F,
+               lifesign = 'full',
+               rep = 2,
+               algorithm = "rprop+",
+               stepmax = 100000, likelihood=TRUE, )
+}
+
+nets()
+  
+stop.time<-proc.time()
+  
+run.time<-stop.time -start.time
+  
+print(run.time)
+
+print("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+  
+stopCluster(cl)
+
+  
+start.time<-proc.time()
+  
+  neuralnet(Transported ~ .,
+               data = dfTrain5zz,
+               hidden = 1,
+               err.fct = "ce",
+               linear.output = F,
+               lifesign = 'full',
+               rep = 2,
+               algorithm = "rprop+",
+               stepmax = 100000, likelihood=TRUE, )
+  
+stop.time<-proc.time()
+  
+run.time<-stop.time -start.time
+  
+print(run.time)
+
+
+
+```
+
+
+```{r}
+# Load the parallel library
+library(parallel)
+library(neuralnet)
+
+# Get the number of threads in the current machine
+nThreads <- detectCores()
+nThreads
+
+# Initialise the cluster of threads
+clusterOfThreads <- makeCluster(nThreads)
+
+# Register the cluster of threads
+#registerDoParallel(clusterOfThreads, cores=nThreads)
+
+# Create a random set of nucleotide sequences
+
+nets <- function() {
+  
+  neuralnet(Transported ~ .,
+               data = dfTrain5zz,
+               hidden = 2,
+               err.fct = "ce",
+               linear.output = F,
+               lifesign = 'full',
+               rep = 2,
+               algorithm = "rprop+",
+               stepmax = 1000000, likelihood=TRUE, )
+  
+}
+
+# Use multiple threads to count how many times each nucleotide appears in each sequence
+frequences <- clusterApply(cl=clusterOfThreads,
+                           x=dfTrain5zz,
+                           fun=nets)
+
+# REMEMBER to close the cluster of threads
+stopCluster(clusterOfThreads)
+
+```
+
+
 ```{r}
 
 library(neuralnet)
