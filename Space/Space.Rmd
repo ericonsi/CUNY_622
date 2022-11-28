@@ -294,6 +294,14 @@ dfTrain5Num <- dfTrain5 %>%
 
 ```
 
+```{r}
+
+df5Num <- dfTrain5 %>%
+  dplyr::select(where(is.numeric)) 
+df5Num <- na.omit(df5Num)
+
+EHExplore_Multicollinearity(df5Num)
+```
 
 ### Perform Logistic Regression
 
