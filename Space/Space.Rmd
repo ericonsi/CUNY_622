@@ -313,7 +313,7 @@ dfTrain5z$Inter_CountShop = dfTrain5z$Group*dfTrain5z$ShoppingMall
 dfTrain5z$Inter_CountAge = dfTrain5z$Group*dfTrain5z$Age #Gets worse for Age and Foodcourt
 
 dfTrain5zz <- dfTrain5z %>%
-  dplyr::select(-count, -Cabin3)
+  dplyr::select(-count)
 
 dfTest5z <- dfTest5
 dfTest5z$Group = ifelse(dfTest5z$count>1,1,0)
@@ -594,6 +594,7 @@ test <- scale(test, center = m, scale = s)
 
 
 ```
+
 ```{r}
 
 dfTrain5z <- dfTrain5 %>% dplyr::select(-starts_with('cabin'))
@@ -620,7 +621,7 @@ dfSmallScaled <- EHPrepare_ScaleAllButTarget(dfSmall, "Transported")
 library(neuralnet)
 set.seed(42760)
 n <- neuralnet(Transported ~ .,
-               data = dfSmall,
+               data = dfTrain5zz,
                hidden = 2,
                err.fct = "ce",
                linear.output = F,
@@ -677,6 +678,13 @@ write_csv(predictions, "C:\\Users\\erico\\Desktop\\SVMpredictions2.csv")
 #makePredictions2(c)
 
 ```
+```{r}
+
+
+
+```
+
+
 
 
 
