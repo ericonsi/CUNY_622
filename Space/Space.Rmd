@@ -627,7 +627,7 @@ registerDoParallel(cl)
   
 start.time<-proc.time()
   
-  rad <- EHModel_SVM(dfTrain5zz, "Transported", method="radial")
+  rad <- EHModel_SVM(dfTrain5zz, "Transported", method="linear")
   
 stop.time<-proc.time()
   
@@ -643,7 +643,7 @@ stopCluster(cl)
 predictions_rad <- EHModel_Predict(rad$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
 predictions_rad$Transported <- ifelse(predictions_rad$Transported==1,"True","False")
-write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_Rad.csv")
+write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_Lin.csv")
 
 ```
 
@@ -779,32 +779,46 @@ stopCluster(clusterOfThreads)
 
 library(neuralnet)
 set.seed(42760)
+
+dfTrain5zz$Transported = as.factor(dfTrain5zz$Transported)
+dfScale <- EHPrepare_ScaleAllButTarget(dfTrain5zz, "Transported")
+
 n <- neuralnet(Transported ~ .,
-               data = dfTrain5zz,
+               data = dfScale,
                hidden = 2,
                err.fct = "ce",
                linear.output = F,
                lifesign = 'full',
                rep = 2,
                algorithm = "rprop+",
-               stepmax = 1000000, likelihood=TRUE, )
+               stepmax = 100000, likelihood=TRUE, )
 
 ```
 
 ```{r}
 
-plot(n, rep = 1)
+plot(n, rep = 2)
 
 ```
 
 
 
 ```{r}
+predicts <- predict(n, dfTest5zz)
+predict_nn <- as.data.frame(predict(n, dfTest5zz)) %>%
+  dplyr::select(V1) %>%
+  dplyr::rename("Transported" = V1) %>%
+  mutate(Transported=as.numeric(Transported)) %>%
+  mutate(Transported=ifelse(Transported>.5,"True","False"))
 
-predictions_nn <- EHModel_Predict(n, dfTest5, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+predictions_nn2 <- cbind("PassengerID" = dfTest5zz$PassengerID, predict_nn)
 
-predictions_nn$Transported <- ifelse(predictions_nn$Transported==1,"True","False")
-write_csv(predictions_nn, "C://Users//eric.hirsch//Desktop//NN.csv")
+
+
+predictions_nn <- EHModel_Predict(n, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+
+predictions_nn2$Transported <- ifelse(predictions_nn2$Transported>.5,"True","False")
+write_csv(predictions_nn, "C://Users//erico//Desktop//NN_3Layers.csv")
 
 ```
 
