@@ -321,6 +321,9 @@ dfTestA$Group <- Group2a$Group
 
 dfTestAA <- inner_join(dfTestA, Group2aSum, by="Group") %>% dplyr::select(-Group)
 
+dfTrainAA$InAGroup = ifelse(dfTrainAA$count>1,1,0)
+dfTestAA$InAGroup = ifelse(dfTestAA$count>1,1,0)
+
 dfTrain1 <- na.omit(dfTrainAA)
 dfTest1 <- EHPrepare_MissingValues_Imputation(dfTestAA, impute="median")
 
@@ -375,25 +378,26 @@ dfTest5 <- cbind(PassengerID, dfTest5)
 ```
 ## Implement Interaction Features
 
-### Perform Logistic Regression With Engineered Features
+```{r}
 
-We perform a logistic regression with what we have and post to Kaggle just to get a baseline.  Accuracy on training is 77%, significantly better than the 51% no information rate, but gives us only 69% on the Kaggle set which puts us at the 9th percentile.
+dfTrain5$Inter_CountShop = dfTrain5$InAGroup*dfTrain5$ShoppingMall
+dfTest5$Inter_CountShop = dfTest5$InAGroup*dfTest5$ShoppingMall
+
+```
+
+
+
+### Perform Logistic Regression With Engineered Features: 26th Percnetile
+
+We perform a logistic regression with what we have and post to Kaggle just to get a baseline.  Accuracy on training is 79% (compared to 77% on the untransformed training set), but more importantly, this gives us only 78% on the Kaggle set which puts us at the 926th percentile.
 
 ```{r}
 dfTrain5z <- dfTrain5
-dfTrain5z$Group = ifelse(dfTrain5z$count>1,1,0)
-
-dfTrain5z$Inter_CountShop = dfTrain5z$Group*dfTrain5z$ShoppingMall
-dfTrain5z$Inter_CountAge = dfTrain5z$Group*dfTrain5z$Age #Gets worse for Age and Foodcourt
 
 dfTrain5zz <- dfTrain5z %>%
   dplyr::select(-count)
 
 dfTest5z <- dfTest5
-dfTest5z$Group = ifelse(dfTest5z$count>1,1,0)
-
-dfTest5z$Inter_CountShop = dfTest5z$Group*dfTest5z$ShoppingMall
-dfTest5z$Inter_CountAge = dfTest5z$Group*dfTest5z$Age #Gets worse for Age and Foodcourt
 
 dfTest5zz <- dfTest5z %>%
   dplyr::select(-count)
@@ -406,160 +410,130 @@ write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_WithFeatures.csv"
 
 ```
 
-### Perform PCA
+## More Complex Models
+
+Given the apparent complexity of the data shape, we turn to more complex nonparametric models to improve our predictions. 
+
+### Perform SVM: 70th Percentile
+
+We begin with Support Vector Machines and try three kernels - linear, poly and radial.  Radial performs the best (accuracy=80.1%) and boosts us to the 70th percentile.
+
+```{r}
+library(doParallel)
+
+cl<-makePSOCKcluster(7)
+  
+registerDoParallel(cl)
+
+print("Linear: --------------------------------------")
+#lin <- EHModel_SVM(dfTrain5zz, "Transported", method="linear")
+print("Poly: --------------------------------------")
+#poly <- EHModel_SVM(dfTrain5zz, "Transported", method="poly")
+print("Radial: --------------------------------------")
+rad <- EHModel_SVM(dfTrain5zz, "Transported", method="radial")
+
+predictions_rad <- EHModel_Predict(rad$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+
+predictions_rad$Transported <- ifelse(predictions_rad$Transported==1,"True","False")
+write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_Rad.csv")
+
+stopCluster(cl)
+
+```
+### Perform limited Neural Networks
+
+Neural Networks require a great deal of computer resources and time.  A simple first pass with two hidden layers took a great deal of time, needed a high stepmax to converge and provided poor results (15th percentile).  The algorithm was therefore difficult to hypertune.
 
 ```{r}
 
+library(neuralnet)
+set.seed(42760)
 
-#pca <- prcomp(dfTrain5zz, center = TRUE,scale. = TRUE)
+dfTrain5zz$Transported = as.factor(dfTrain5zz$Transported)
+dfScale <- EHPrepare_ScaleAllButTarget(dfTrain5zz, "Transported")
 
-#summary(pca)
-#plot(pca)
-
-
-```
-
-
-
-### Perform Random Forest
-
-```{r}
-dfSmall <- dfTrain5 %>%
-  dplyr::filter(row_number() %% 15 ==1) 
-
-#a <- EHModel_RandomForest(dfTrain5zz, "Transported")  #RESTORE
-#predictions_rf <- EHModel_Predict(a$rf, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
-
-#predictions_rf$Transported <- ifelse(predictions_rf$Transported==1,"True","False")
-#write_csv(predictions_rf, "C://Users//erico//Desktop//RF1.csv")
-```
-
-
-Didn't Do This:
-
-```{r}
-
-#install_github("vqv/ggbiplot")
-#library(ggbiplot)
-#ggbiplot(pca, labels=dfx1$HomePlanet)
+n <- neuralnet(Transported ~ .,
+               data = dfScale,
+               hidden = 2,
+               err.fct = "ce",
+               linear.output = F,
+               lifesign = 'full',
+               rep = 2,
+               algorithm = "rprop+",
+               stepmax = 100000, likelihood=TRUE, )
 
 ```
-
-### Perfomr K-Means
-
 ```{r}
 
+plot(n, rep = 2)
 
-library(factoextra)
-
-#fviz_nbclust(dfTrain5zz, kmeans, method = "wss") #RESTORE
-
-#k2 <- kmeans(dfTrain5zz, centers=9, iter.max = 10, nstart = 1)
-#fviz_cluster(k2, data = dfTrain5zz)
 ```
 
 ```{r}
+predicts <- predict(n, dfTest5zz)
+predict_nn <- as.data.frame(predict(n, dfTest5zz)) %>%
+  dplyr::select(V1) %>%
+  dplyr::rename("Transported" = V1) %>%
+  mutate(Transported=as.numeric(Transported)) %>%
+  mutate(Transported=ifelse(Transported>.5,"True","False"))
 
-#dfNumC <- cbind(dfNum, Cluster = k2$cluster)
+predictions_nn <- EHModel_Predict(n, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
-#dfNumCSum <- dfNumC %>%
-#  group_by(Cluster) %>%
-#  dplyr::summarise(across(everything(), mean))
+write_csv(predictions_nn, "C://Users//erico//Desktop//nn.csv")
 
-#dfNumCSumS <- scale(dfNumCSum)
-#qq <- as.matrix(dfNumCSumS)
-
-#heatmap(qq, Rowv = NA, Colv = NA)
-
-#EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfNumC, "Cluster")
 ```
 
-### Create a smaller database
-
-
-```{r}
-dfSmall <- dfTrain5 %>%
-  dplyr::filter(row_number() %% 2 ==1) 
-```
-
-### Perform GBM
+In order to address the long time until convergence (many hours), we experimented with dimensionality reduction, but this was ineffective.  PCA, e.g., did not result in a small number of components taking the largest share of variance.  Taking a sample of records or  manually eliminating columns allowed for faster run times but hurt performance.  Below is the result of PCA analysis: 
 
 ```{r}
 
- #SECOND BEST MODEL!!
-library(gbm)
-boost=gbm(Transported ~ . ,data = dfTrain5, distribution = "gaussian",n.trees = 10000,
-                  shrinkage = 0.01, interaction.depth = 4)
-boost
+pca <- prcomp(dfTrain5zz, center = TRUE,scale. = TRUE)
 
-summary(boost) #Summary gives a table of Variable Importance and a plot of Variable Importance
-
-predictions2 <- as.data.frame(predict(boost, dfTest5)) %>%
-  rename(Transported = 1) 
-
-result <- as.data.frame(cbind(dfTest5$PassengerID, predictions2$Transported)) %>%
-  rename(PassengerID = 1, Transported=2) %>%
-  mutate(Transported = ifelse(Transported>.5,'True','False'))
-
-
-
-write_csv(result, "C:\\Users\\erico\\Desktop\\SVMpredictions5.csv")
+summary(pca)
+plot(pca)
 
 ```
 
-### Perform SVM
+### Tree Algorithms 1: Perform Random Forest: 34th Percentile
+
+We begin with tree models.  Random forest is our first. We use the parallel library to run the model on multiple cores.
+
+This improves accuracy on the test set to 78.7% which puts us in the 34th percentile
 
 ```{r}
-#svm2 <- EHModel_SVM(dfTrain5zz, "Transported", method="poly") #RESTORE
+library(doParallel)
 
-#predictions_svm <- EHModel_Predict(svm2$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+cl<-makePSOCKcluster(7)
+  
+registerDoParallel(cl)
 
-#predictions_svm$Transported <- ifelse(predictions_svm$Transported==1,"True","False")
-#write_csv(predictions_svm, "C://Users//erico//Desktop//SVMPoly.csv")
+
+a <- EHModel_RandomForest(dfTrain5zz, "Transported")
+predictions_rf <- EHModel_Predict(a$rf, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+
+predictions_rf$Transported <- ifelse(predictions_rf$Transported==1,"True","False")
+write_csv(predictions_rf, "C://Users//erico//Desktop//RF1.csv")
+
+  
+stopCluster(cl)
+
 ```
 
-Perfomr K means
+### Tree Algorithms 2: Perform XGBoost Untuned: 73rd Percentile
 
-```{r}
-library(factoextra)
+At the 34th percentile we need a more powerful model.  As an active learner, XGBoost is likely to fit our training model better than random forest, though it may overfit the data.  Our untuned model, with 55 rounds, achieves 80.2% accuracy and reaches the 74th percentile. 
 
-#fviz_nbclust(dfNum, kmeans, method = "wss")
-
-#k2 <- kmeans(dfNum, centers=3, iter.max = 10, nstart = 1)
-#fviz_cluster(k2, data = dfNum)
-```
-
-Perform XGBoost - also does some feature engineering
 ```{r}
 library(xgboost)
 library(caret)
-#BEST MODEL 221106-1123
 
-#need to scale?
-
-#make this example reproducible
 set.seed(0)
 
 dfTrain5q <-dfTrain5
 dfTest5q <- dfTest5
 
-dfTrain5q$VRDeck=log(dfTrain5$VRDeck+1)
-dfTest5q$VRDeck=log(dfTest5$VRDeck+1)
-dfTrain5q$FoodCourt=log(dfTrain5$FoodCourt+1)
-dfTest5q$FoodCourt=log(dfTest5$FoodCourt+1)
-
 dfTrain5q$Transported = as.character(dfTrain5q$Transported)
 dfTrain5$Transported = as.character(dfTrain5$Transported)
-
-dfTrain5q$Group = ifelse(dfTrain5q$count>1,1,0)
-dfTrain5$Group = ifelse(dfTrain5$count>1,1,0)
-
-dfTrain5q$Inter_CountShop = dfTrain5q$Group*dfTrain5q$ShoppingMall
-#dfTrain5q$Inter_CryoAge = dfTrain5q$CryoSleep_True*dfTrain5q$Age
-#dfTrain5q$Inter_CountFood = dfTrain5q$Group*dfTrain5q$Age Gets worse for Age and Foodcourt
-dfTrain5q$Inter_CryoFC = dfTrain5q$CryoSleep_True*dfTrain5q$FoodCourt
-#dfTrain5q <- dfTrain5q %>%
-#  dplyr::filter(VRDeck<9)
 
 
 train_x <- dfTrain5q %>%
@@ -569,12 +543,6 @@ train_y <- dfTrain5q %>%
 
 dfTest6 <- dfTest5q
 dfTest6$Transported = "1"
-
-dfTest6$Group = ifelse(dfTest6$count>1,1,0)
-dfTest6$Inter_CountShop = dfTest6$Group*dfTest6$ShoppingMall
-#dfTest6$Inter_CryoAge = dfTest6$CryoSleep_True*dfTest6$Age
-#dfTest6$Inter_CountFood = dfTest6$Group*dfTest6$Age  
-dfTest6$Inter_CryoFC = dfTest6$Group*dfTest6$FoodCourt  
 
 test_x <- dfTest6 %>%
   dplyr::select(-Transported,-PassengerID, -count)
@@ -588,35 +556,13 @@ xgb_test <- xgb.DMatrix(data = as.matrix(test_x), label = as.matrix(test_y))
 #tRIAL AND ERROR GAVE 14 AS BEST with max.depth at 3 - COULD TRY OTHERS
 #depth of 1000 and nrounds 100000 showed no double descent
 
-model2 <- xgb.train(data = xgb_train, max.depth = 3, nrounds = 14)
-
-#predictions_XGBoost <- EHModel_Predict(model2, xgb_test, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
-
-set.seed(100)
-cv <- xgb.cv(data = xgb_train, nrounds = 100, nthread = 2, nfold = 10, metrics = list("rmse","auc"),
-                  max_depth = 3, eta = 1, objective = "binary:logistic")
-print(cv)
-print(cv, verbose=TRUE)
-
-# Check which round was the best iteration (the one that initiated the early stopping)
-print(cv$best_iteration)
-
-# Get the predictions
-head(cv$pred)
-
-# Train a model using 3 rounds (corresponds to best iteration)
-trained_model <- xgb.train(data = xgb_train, max_depth = 3,
-              eta = 1, nthread = 4, nrounds = 14,
-              watchlist = list(train = xgb_train, eval = xgb_test),
-              objective = "binary:logistic")
-# Get predictions
-head(predict(trained_model, xgb_train))
+model2 <- xgb.train(data = xgb_train, max.depth = 3, nrounds = 50)
 
 ```
 
 ```{r}
 
-predictions <- predict(trained_model,newdata=xgb_test)
+predictions <- predict(model2,newdata=xgb_test)
 predictions <- data.frame(as.vector(predictions)) 
 predictions$PassengerId <- dfTest5$PassengerID
 predictions[,c(1,2)] <- predictions[,c(2,1)]
@@ -625,152 +571,27 @@ colnames(predictions) <- c("PassengerID", "Transported")
 predictions <- predictions %>%
   mutate(Transported=ifelse(Transported>.5,'True','False'))
 
-#write_csv(predictions, "C:\\Users\\Eric\\Desktop\\XGBpredictions1.csv")
-write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds14_CryoAge.csv")
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds50.csv")
 
 ```
 
-Neural network
-```{r}
-
-# https://www.r-bloggers.com/2021/04/deep-neural-network-in-r/
-
-#takes too long
-#n <- neuralnet(Transported ~ .,
-#              data = dfTrain5,
-#               hidden = c(12,7),
-#               linear.output = F,
-#               lifesign = 'full',
-#               rep=1)
-```
-```{r}
-#Needs above step
-
-#plot(n,col.hidden = 'darkgreen',     
-#col.hidden.synapse = 'darkgreen',
-#     show.weights = F,
-#     information = F,
-#     fill = 'lightblue')
-
-```
-```{r}
-
-data <- as.matrix(dfTrain5)
-dimnames(data) <- NULL
-
-```
-
+### Hypertuning
 
 
 ```{r}
+set.seed(100)
+cv <- xgb.cv(data = xgb_train, nrounds = 100, nthread = 2, nfold = 10, metrics = list("rmse","auc", "error"),
+                  max_depth = 3, eta = 1, objective = "binary:logistic")
+print(cv)
+print(cv, verbose=TRUE)
 
-dfTrain5z <- dfTrain5 %>% dplyr::select(-starts_with('cabin'))
 
-dfSmall2 <- dfSmall %>%
-  dplyr::select(-Cabin1_T)
-summary(dfSmall2)
-
-#pca <- prcomp(dfSmall2, center = TRUE,scale. = TRUE)
-
-#summary(pca)
-#plot(pca)
-#dfPCA <- as.data.frame(pca$x)
-#dfPCA2 <- cbind(Transported = dfSmall$Transported, dfPCA)
-
-#dfPCASmall <- dfPCA2 %>%
-#  dplyr::select(PC1, PC2, PC3, PC4, Transported)
-
-#dfSmallScaled <- EHPrepare_ScaleAllButTarget(dfSmall, "Transported")
+# Train a model using 14 rounds (corresponds to best iteration)
+trained_model <- xgb.train(data = xgb_train, max_depth = 3,
+              eta = 1, nthread = 4, nrounds = 14,
+              watchlist = list(train = xgb_train, eval = xgb_test),
+              objective = "binary:logistic")
+# Get predictions
+head(predict(trained_model, xgb_train))
 ```
-
-
-
-```{r}
-library(doParallel)
-
-cl<-makePSOCKcluster(7)
-  
-registerDoParallel(cl)
-  
-start.time<-proc.time()
-  
-  rad <- EHModel_SVM(dfTrain5zz2, "Transported", method="radial")
-  
-stop.time<-proc.time()
-  
-run.time<-stop.time -start.time
-  
-print(run.time)
-  
-stopCluster(cl)
-
-```
-
-```{r}
-predictions_rad <- EHModel_Predict(rad$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
-
-predictions_rad$Transported <- ifelse(predictions_rad$Transported==1,"True","False")
-write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_radouliersRemoved.csv")
-
-```
-
-
-
-
-
-
-```{r}
-
-library(neuralnet)
-set.seed(42760)
-
-dfTrain5zz$Transported = as.factor(dfTrain5zz$Transported)
-dfScale <- EHPrepare_ScaleAllButTarget(dfTrain5zz, "Transported")
-
-#n <- neuralnet(Transported ~ .,
-               #data = dfScale,
-               #hidden = 2,
-               #err.fct = "ce",
-               #linear.output = F,
-               #lifesign = 'full',
-              # rep = 2,
-              # algorithm = "rprop+",
-              # stepmax = 100000, likelihood=TRUE, )
-
-```
-
-```{r}
-
-#plot(n, rep = 2)
-
-```
-
-
-
-```{r}
-#predicts <- predict(n, dfTest5zz)
-#predict_nn <- as.data.frame(predict(n, dfTest5zz)) %>%
-#  dplyr::select(V1) %>%
-#  dplyr::rename("Transported" = V1) %>%
-#  mutate(Transported=as.numeric(Transported)) %>%
-#  mutate(Transported=ifelse(Transported>.5,"True","False"))
-
-#predictions_nn2 <- cbind("PassengerID" = dfTest5zz$PassengerID, predict_nn)
-
-
-
-#predictions_nn <- EHModel_Predict(n, dfTest5zz, predictionsColumnName = #"Transported", testData_IDColumn = "PassengerID")
-
-#predictions_nn2$Transported <- ifelse(predictions_nn2$Transported>.5,"True","False")
-#write_csv(predictions_nn, "C://Users//erico//Desktop//NN_3Layers.csv")
-
-```
-
-
-
-
-
-
-
-
 
