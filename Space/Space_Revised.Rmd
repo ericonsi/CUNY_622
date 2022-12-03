@@ -85,6 +85,7 @@ One of the biggest advantages of neural networks is that they effectively do the
 Accurate prediction depends not only on algorithm choice. We also need to engineer features (except possibly in very large neural nets) and tune hyperparameters.  We also need to choose metrics that tell us whether or not our model is effective.
 
 ## Prediction using the Kaggle Spaceship Titanic Data Set
+
 For this exercise I’ve chosen a Kaggle Competition – the Kaggle Spaceship data set.  The advantages of using this a competition data set are that we can compare our performance those of others. Achieving 90% on a holdout set in and of itself tells us nothing - we don’t know if achieving 95% would have been easy or impossible. In this competition, the 2,000 or so submitted accuracies on the leaderboard range from about 76% to 82%, which gives us a good idea of how well our model is working.
 
 The main disadvantages of this data set are that the data is made up and the scenario a bit far-fetched. However, I wanted a data set that had a simple class as a target, as opposed to an image example, and the standard Titanic data set has been over analyzed, this was one of the few good choices.
@@ -139,6 +140,8 @@ The data set holds a number of opportunities for feature engineering. Through te
 dfTrain <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\train.csv")
 dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
 
+dfTrain$Transported = ifelse(dfTrain$Transported=="True",1,0)
+
 #dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\train.csv")
 #dfTest <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\test.csv")
 ```
@@ -148,6 +151,8 @@ dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
 
 #### A. Summary Statistics
 
+The data consists of 8693 records and 14 variables (6 numeric nd 8 character). There are a number of missing values and what appear to be skewed distributions among the numeric variables.
+
 ```{r}
 summary(dfTrain)
 str(dfTrain)
@@ -156,12 +161,36 @@ dfTrain %>%
 ```
 
 
-### Distributions
+### Distributions: Skewedness and outliers
+
+We at the distribution of all numeric variables.  Spending variables are highly skewed - most passengers spend no money while a few spend a great deal. We can see that spending on luxuries (the spa, room service, etc.) is strongly negatively correlated with being transported - this supports the supposition that the rich were spared. Spending on more popular amenities like the food court and shopping mall are also negatively correlated but less so. Age has a small negative correlation as well.
+
+We decide not to log transform the numeric variables as normal distributions for predictors are not required by our models and interpretability suffers.
+
+```{r}
+dfTrainD <- dfTrain
+
+EHSummarize_StandardPlots(dfTrainD, "Transported")
 
 
+```
 
+Here we look at count plots for character variables.  Home and destination have an association with transported, but cryoSleep is especially important - over 75% of those in cryosleep were transported.
 
-### Look at Multicollinearity
+```{r}
+
+dfCount <- dfTrainD %>%
+  dplyr::select(HomePlanet, CryoSleep, VIP, Destination, Transported)
+
+dfCount$Transported <- as.character(dfCount$Transported)
+EHExplore_TwoCategoricalColumns_Barcharts(dfCount, "Transported")
+
+```
+Because we have no reason to think that outliers are errors in data entry or significant data anomalies, and because our algorithms are relatively resistant to outliers, we do not remove outliers from the dataset.
+
+### Multicollinearity
+
+While we were aware of the correlations with Transported, it is interesting to note that the correlations among various forms of spending are actually quite mild.  We do not need to address multicollinearity in any systematic way.
 
 ```{r}
 
@@ -169,47 +198,47 @@ dfNum <- dfTrain %>%
   dplyr::select(where(is.numeric)) 
 dfNum <- na.omit(dfNum)
 
-EHExplore_Multicollinearity(dfNum)
+a <- EHExplore_Multicollinearity(dfNum)
 ```
 
 ### Look at Missing Values
 
-```{r}
+Missing values mainly appear for the amenities spending variables in the dataset.  There are over 1,000 (12% of the database). 
 
+```{r}
 EHSummarize_MissingValues(dfTrain)
+```
+
+The missing values are not correlated with each other, suggesting they are probably missing at random.  To further support this hypothesis we create flags for missing values and perform Chi Square tests against the target variable.  None of the flags are significant.  We will therefore remove the records with missing values from the training set (we will do this after some feature engineering), and impute the median for the test set.  
+
+```{r}
 
 dfMissingRecordsFlagAny <- dfTrain %>%
     mutate(Flag=ifelse(rowSums(is.na(dfTrain)) > 0, 1, 0)) %>%
-    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
     dplyr::select(Transported, Flag)
 
 dfMissingRecordsFlag_RoomService <- dfTrain %>%
     mutate(RoomServiceFlag=ifelse(is.na(dfTrain$RoomService) > 0, 1, 0)) %>%
-    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
       dplyr::select(Transported, RoomServiceFlag)
 
 
 dfMissingRecordsFlag_VRDeck <- dfTrain %>%
     mutate(VRDeckFlag=ifelse(is.na(dfTrain$VRDeck) > 0, 1, 0)) %>%
-    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
       dplyr::select(Transported, VRDeckFlag)
 
 
 dfMissingRecordsFlag_SPA <- dfTrain %>%
     mutate(SpaFlag=ifelse(is.na(dfTrain$Spa) > 0, 1, 0)) %>%
-    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
       dplyr::select(Transported, SpaFlag)
 
 
 dfMissingRecordsFlag_ShoppingMall <- dfTrain %>%
     mutate(ShoppingMallFlag=ifelse(is.na(dfTrain$ShoppingMall) > 0, 1, 0)) %>%
-    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
       dplyr::select(Transported, ShoppingMallFlag)
 
 
 dfMissingRecordsFlag_FoodCourt <- dfTrain %>%
     mutate(FoodCourtFlag=ifelse(is.na(dfTrain$FoodCourt) > 0, 1, 0)) %>%
-    mutate(Transported=ifelse(Transported=='True',1,0)) %>%
       dplyr::select(Transported, FoodCourtFlag)
 
 print(chisq.test(table(dfMissingRecordsFlagAny)))
@@ -221,13 +250,14 @@ print(chisq.test(table(dfMissingRecordsFlag_RoomService)))
 
 ```
 
-### First Pass: Logistic regression
+### First Pass Logistic Regression:  9th percentile
+
+We perform a logistic regression with what we have and post to Kaggle just to get a baseline.  Accuracy on training is 77%, significantly better than the 51% no information rate, but gives us only 69% on the Kaggle set which puts us at the 9th percentile.
 
 ```{r}
 
 
 dfTrainNum <- dfTrain %>%
-  mutate(Transported=ifelse(Transported=='True',1,0)) %>%
   dplyr::select(where(is.numeric)) 
 
 dfTestNum <- dfTest %>%
@@ -245,34 +275,37 @@ write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_FirstPass.csv")
 ```
 ### Data Preparation and Feature Engineering
 
-### 1. Create Groups needs to be done before missing values correction since it counts group members
+### 1. We create groups based on the Passenger ID
+
+Passenger IDs are constructed to identify passengers travelling in groups.  We create groupings from the ID.
+
+How likely is it that if the majority of members of a group transported, then they all transported? Only somewhat likely.  A histogram shows the distribution of percentages of transported within groups. Most often, half the members transported and half did not.  
 
 ```{r}
 
-Group2 <- dfTrain %>% dplyr::select(PassengerId, Transported) %>% mutate(Transported=ifelse(Transported=='True',1,0))
+Group2 <- dfTrain %>% dplyr::select(PassengerId, Transported) 
 
 Group2$Group <- sub("\\_.*", "", Group2$PassengerId)
 
 Group2Sum <- Group2 %>%
   dplyr::group_by(Group) %>%
-  dplyr::summarize(PredPercent= sum(Transported)/dplyr::n(), count=dplyr::n())
+  dplyr::summarize(PercentageTransported= sum(Transported)/dplyr::n(), count=dplyr::n())
 
 Group2SumGroups <- Group2Sum %>%
   filter(count>1)
 
-hist(Group2SumGroups$PredPercent)
+hist(Group2SumGroups$PercentageTransported)
 
 
 dfTrainA <- dfTrain
 
 dfTrainA$Group <- Group2$Group
 
-dfTrainAA <- inner_join(dfTrainA, Group2Sum, by="Group") %>% dplyr::select(-Group, -PredPercent)
+dfTrainAA <- inner_join(dfTrainA, Group2Sum, by="Group") %>% dplyr::select(-Group, -PercentageTransported)
 
-dfTrainBB <- dfTrainAA %>%
-  mutate(Transported = ifelse(Transported=="True",1,0))
+dfTrainBB <- dfTrainAA 
 
-boxplot(as.numeric(dfTrainBB$count), as.numeric(dfTrainBB$Transported))
+#boxplot(as.numeric(dfTrainBB$count), as.numeric(dfTrainBB$Transported))
 
 Group2a <- dfTest %>% dplyr::select(PassengerId) 
 
@@ -288,32 +321,25 @@ dfTestA$Group <- Group2a$Group
 
 dfTestAA <- inner_join(dfTestA, Group2aSum, by="Group") %>% dplyr::select(-Group)
 
-```
-
-### Handle Missing Variables
-
-```{r}
 dfTrain1 <- na.omit(dfTrainAA)
-#dfTrain1 <- EHPrepare_MissingValues_Imputation(dfTrainAA, impute="median")
 dfTest1 <- EHPrepare_MissingValues_Imputation(dfTestAA, impute="median")
 
 ```
 
 ### Create Cabin variables
 
+Cabin variables consist of 3 parts in the form of a/b/c which indicate the location of the cabin on the ship. Here we extract out parts "a" and "c" - b appears to have no influence on the target.
+
 ```{r}
 library(stringr)
 dfTrain1$Cabin1 <- substr(dfTrain1$Cabin,1,1)
 dfTrain1$Cabin2 <- str_sub(dfTrain1$Cabin, - 1, - 1) 
-#dfTrain1$Cabin3 <- as.numeric(gsub(".*?([0-9]+).*", "\\1", dfTrain1$Cabin))
 
 dfTrain2 <- dfTrain1 %>%
-  dplyr::select(-Cabin) %>%
-  mutate(Transported=ifelse(Transported=="True",1,0))
+  dplyr::select(-Cabin)
 
 dfTest1$Cabin1 <- substr(dfTest1$Cabin,1,1)
 dfTest1$Cabin2 <- str_sub(dfTest1$Cabin, - 1, - 1) 
-#dfTest1$Cabin3 <- as.numeric(gsub(".*?([0-9]+).*", "\\1", dfTest1$Cabin))
 
 dfTest2 <- dfTest1 %>%
   dplyr::select(-Cabin)
@@ -322,20 +348,9 @@ dfTrain3 <- dfTrain2
 dfTest3 <- dfTest2
 ```
 
-```{r}
-
-
-a <- EHSummarize_SingleColumn_Histograms(dfTrain3)
-grid.arrange(grobs=a[c(1:6)], ncol=3)
-
-EHExplore_OneContinuousAndOneCategoricalColumn_Boxplots(dfTrain3, "Transported")
-#grid.arrange(grobs=b[c(1:8)], ncol=1)
-
-EHSummarize_StandardPlots(dfTrain3, "Transported")
-
-```
-
 ### Create Dummy Variables
+
+Now that we have engineered Cabin, we create dummy variables to handle category variables throughout the dataset.
 
 ```{r}
 
@@ -346,27 +361,23 @@ PassengerID <- dfTest3$PassengerId
 dfTest4 <- dfTest3 %>%
   dplyr::select(-Name, -PassengerId)
 
-dfTrain5 <- EHPrepare_CreateDummies(dfTrain4, "Transported")
-dfTest5 <- EHPrepare_CreateDummies(dfTest4, "Transported")
+dfTrain5v <- EHPrepare_CreateDummies(dfTrain4, "Transported")
+dfTrain5 <- dfTrain5v %>%
+  dplyr::select(-Cabin2_)
+
+dfTest5v <- EHPrepare_CreateDummies(dfTest4, "Transported")
+dfTest5 <- dfTest5v %>%
+  dplyr::select(-Cabin2_)
 
 dfTest5 <- cbind(PassengerID, dfTest5)
 
-dfTrain5Num <- dfTrain5 %>%
-  dplyr::select(where(is.numeric)) 
-
 
 ```
+## Implement Interaction Features
 
-```{r}
+### Perform Logistic Regression With Engineered Features
 
-df5Num <- dfTrain5 %>%
-  dplyr::select(where(is.numeric)) 
-df5Num <- na.omit(df5Num)
-
-EHExplore_Multicollinearity(df5Num)
-```
-
-### Perform Logistic Regression With Features
+We perform a logistic regression with what we have and post to Kaggle just to get a baseline.  Accuracy on training is 77%, significantly better than the 51% no information rate, but gives us only 69% on the Kaggle set which puts us at the 9th percentile.
 
 ```{r}
 dfTrain5z <- dfTrain5
@@ -532,6 +543,11 @@ set.seed(0)
 dfTrain5q <-dfTrain5
 dfTest5q <- dfTest5
 
+dfTrain5q$VRDeck=log(dfTrain5$VRDeck+1)
+dfTest5q$VRDeck=log(dfTest5$VRDeck+1)
+dfTrain5q$FoodCourt=log(dfTrain5$FoodCourt+1)
+dfTest5q$FoodCourt=log(dfTest5$FoodCourt+1)
+
 dfTrain5q$Transported = as.character(dfTrain5q$Transported)
 dfTrain5$Transported = as.character(dfTrain5$Transported)
 
@@ -539,7 +555,12 @@ dfTrain5q$Group = ifelse(dfTrain5q$count>1,1,0)
 dfTrain5$Group = ifelse(dfTrain5$count>1,1,0)
 
 dfTrain5q$Inter_CountShop = dfTrain5q$Group*dfTrain5q$ShoppingMall
+#dfTrain5q$Inter_CryoAge = dfTrain5q$CryoSleep_True*dfTrain5q$Age
 #dfTrain5q$Inter_CountFood = dfTrain5q$Group*dfTrain5q$Age Gets worse for Age and Foodcourt
+dfTrain5q$Inter_CryoFC = dfTrain5q$CryoSleep_True*dfTrain5q$FoodCourt
+#dfTrain5q <- dfTrain5q %>%
+#  dplyr::filter(VRDeck<9)
+
 
 train_x <- dfTrain5q %>%
   dplyr::select(-Transported, -count)
@@ -551,7 +572,9 @@ dfTest6$Transported = "1"
 
 dfTest6$Group = ifelse(dfTest6$count>1,1,0)
 dfTest6$Inter_CountShop = dfTest6$Group*dfTest6$ShoppingMall
+#dfTest6$Inter_CryoAge = dfTest6$CryoSleep_True*dfTest6$Age
 #dfTest6$Inter_CountFood = dfTest6$Group*dfTest6$Age  
+dfTest6$Inter_CryoFC = dfTest6$Group*dfTest6$FoodCourt  
 
 test_x <- dfTest6 %>%
   dplyr::select(-Transported,-PassengerID, -count)
@@ -562,10 +585,10 @@ test_y <- dfTest6 %>%
 xgb_train <- xgb.DMatrix(data = as.matrix(train_x), label = as.matrix(train_y))
 xgb_test <- xgb.DMatrix(data = as.matrix(test_x), label = as.matrix(test_y))
 
-#tRIAL AND ERROR GAVE 56 AS BEST with max.depth at 3 - COULD TRY OTHERS
+#tRIAL AND ERROR GAVE 14 AS BEST with max.depth at 3 - COULD TRY OTHERS
 #depth of 1000 and nrounds 100000 showed no double descent
 
-model2 <- xgb.train(data = xgb_train, max.depth = 3, nrounds = 13)
+model2 <- xgb.train(data = xgb_train, max.depth = 3, nrounds = 14)
 
 #predictions_XGBoost <- EHModel_Predict(model2, xgb_test, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
@@ -603,7 +626,7 @@ predictions <- predictions %>%
   mutate(Transported=ifelse(Transported>.5,'True','False'))
 
 #write_csv(predictions, "C:\\Users\\Eric\\Desktop\\XGBpredictions1.csv")
-write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds14.csv")
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds14_CryoAge.csv")
 
 ```
 
@@ -671,7 +694,7 @@ registerDoParallel(cl)
   
 start.time<-proc.time()
   
-#  rad <- EHModel_SVM(dfTrain5zz, "Transported", method="linear")
+  rad <- EHModel_SVM(dfTrain5zz2, "Transported", method="radial")
   
 stop.time<-proc.time()
   
@@ -684,10 +707,10 @@ stopCluster(cl)
 ```
 
 ```{r}
-#predictions_rad <- EHModel_Predict(rad$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+predictions_rad <- EHModel_Predict(rad$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
-#predictions_rad$Transported <- ifelse(predictions_rad$Transported==1,"True","False")
-#write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_Lin.csv")
+predictions_rad$Transported <- ifelse(predictions_rad$Transported==1,"True","False")
+write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_radouliersRemoved.csv")
 
 ```
 
