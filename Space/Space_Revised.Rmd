@@ -146,10 +146,11 @@ dfTrain$Transported = ifelse(dfTrain$Transported=="True",1,0)
 #dfTest <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\test.csv")
 ```
 
+# Code
 
-### 1. Data Exploration
+## 1. Data Exploration
 
-#### A. Summary Statistics
+### A. Summary Statistics
 
 The data consists of 8693 records and 14 variables (6 numeric nd 8 character). There are a number of missing values and what appear to be skewed distributions among the numeric variables.
 
@@ -161,7 +162,7 @@ dfTrain %>%
 ```
 
 
-### Distributions: Skewedness and outliers
+### B. Distributions: Skewedness and Outliers
 
 We at the distribution of all numeric variables.  Spending variables are highly skewed - most passengers spend no money while a few spend a great deal. We can see that spending on luxuries (the spa, room service, etc.) is strongly negatively correlated with being transported - this supports the supposition that the rich were spared. Spending on more popular amenities like the food court and shopping mall are also negatively correlated but less so. Age has a small negative correlation as well.
 
@@ -188,7 +189,7 @@ EHExplore_TwoCategoricalColumns_Barcharts(dfCount, "Transported")
 ```
 Because we have no reason to think that outliers are errors in data entry or significant data anomalies, and because our algorithms are relatively resistant to outliers, we do not remove outliers from the dataset.
 
-### Multicollinearity
+### C. Multicollinearity
 
 While we were aware of the correlations with Transported, it is interesting to note that the correlations among various forms of spending are actually quite mild.  We do not need to address multicollinearity in any systematic way.
 
@@ -201,7 +202,7 @@ dfNum <- na.omit(dfNum)
 a <- EHExplore_Multicollinearity(dfNum)
 ```
 
-### Look at Missing Values
+### D. Missing Values
 
 Missing values mainly appear for the amenities spending variables in the dataset.  There are over 1,000 (12% of the database). 
 
@@ -250,7 +251,7 @@ print(chisq.test(table(dfMissingRecordsFlag_RoomService)))
 
 ```
 
-### First Pass Logistic Regression:  9th percentile
+### E. First Pass Logistic Regression:  9th percentile
 
 We perform a logistic regression with what we have and post to Kaggle just to get a baseline.  Accuracy on training is 77%, significantly better than the 51% no information rate, but gives us only 69% on the Kaggle set which puts us at the 9th percentile.
 
@@ -273,7 +274,7 @@ predictions_logistic$Transported <- ifelse(predictions_logistic$Transported==1,"
 write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_FirstPass.csv")
 
 ```
-### Data Preparation and Feature Engineering
+## Data Preparation and Feature Engineering
 
 ### 1. We create groups based on the Passenger ID
 
@@ -329,7 +330,7 @@ dfTest1 <- EHPrepare_MissingValues_Imputation(dfTestAA, impute="median")
 
 ```
 
-### Create Cabin variables
+### 2. We Create Cabin Variables
 
 Cabin variables consist of 3 parts in the form of a/b/c which indicate the location of the cabin on the ship. Here we extract out parts "a" and "c" - b appears to have no influence on the target.
 
@@ -351,7 +352,7 @@ dfTrain3 <- dfTrain2
 dfTest3 <- dfTest2
 ```
 
-### Create Dummy Variables
+### 3. We Create Dummy Variables
 
 Now that we have engineered Cabin, we create dummy variables to handle category variables throughout the dataset.
 
@@ -376,7 +377,7 @@ dfTest5 <- cbind(PassengerID, dfTest5)
 
 
 ```
-## Implement Interaction Features
+### 4.  Implement Interaction Features
 
 ```{r}
 
@@ -387,7 +388,7 @@ dfTest5$Inter_CountShop = dfTest5$InAGroup*dfTest5$ShoppingMall
 
 
 
-### Perform Logistic Regression With Engineered Features: 26th Percnetile
+### 5. Perform Logistic Regression With Engineered Features: 26th Percentile
 
 We perform a logistic regression with what we have and post to Kaggle just to get a baseline.  Accuracy on training is 79% (compared to 77% on the untransformed training set), but more importantly, this gives us only 78% on the Kaggle set which puts us at the 926th percentile.
 
@@ -414,7 +415,7 @@ write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_WithFeatures.csv"
 
 Given the apparent complexity of the data shape, we turn to more complex nonparametric models to improve our predictions. 
 
-### Perform SVM: 70th Percentile
+### 1. Perform SVM: 70th Percentile
 
 We begin with Support Vector Machines and try three kernels - linear, poly and radial.  Radial performs the best (accuracy=80.1%) and boosts us to the 70th percentile.
 
@@ -440,7 +441,7 @@ write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_Rad.csv")
 stopCluster(cl)
 
 ```
-### Perform limited Neural Networks
+### 2. Perform limited Neural Networks
 
 Neural Networks require a great deal of computer resources and time.  A simple first pass with two hidden layers took a great deal of time, needed a high stepmax to converge and provided poor results (15th percentile).  The algorithm was therefore difficult to hypertune.
 
@@ -449,37 +450,38 @@ Neural Networks require a great deal of computer resources and time.  A simple f
 library(neuralnet)
 set.seed(42760)
 
-dfTrain5zz$Transported = as.factor(dfTrain5zz$Transported)
-dfScale <- EHPrepare_ScaleAllButTarget(dfTrain5zz, "Transported")
+dfTrainN <- dfTrain5zz
+dfTrainN$Transported = as.factor(dfTrainN$Transported)
+dfScale <- EHPrepare_ScaleAllButTarget(dfTrainN, "Transported")
 
-n <- neuralnet(Transported ~ .,
-               data = dfScale,
-               hidden = 2,
-               err.fct = "ce",
-               linear.output = F,
-               lifesign = 'full',
-               rep = 2,
-               algorithm = "rprop+",
-               stepmax = 100000, likelihood=TRUE, )
+#n <- neuralnet(Transported ~ .,
+               #data = dfScale,
+              # hidden = 2,
+               #err.fct = "ce",
+              # linear.output = F,
+              # lifesign = 'full',
+              # rep = 2,
+             #  algorithm = "rprop+",
+             #  stepmax = 100000, likelihood=TRUE, )
 
 ```
 ```{r}
 
-plot(n, rep = 2)
+#plot(n, rep = 2)
 
 ```
 
 ```{r}
-predicts <- predict(n, dfTest5zz)
-predict_nn <- as.data.frame(predict(n, dfTest5zz)) %>%
-  dplyr::select(V1) %>%
-  dplyr::rename("Transported" = V1) %>%
-  mutate(Transported=as.numeric(Transported)) %>%
-  mutate(Transported=ifelse(Transported>.5,"True","False"))
+#predicts <- predict(n, dfTest5zz)
+#predict_nn <- as.data.frame(predict(n, dfTest5zz)) %>%
+#  dplyr::select(V1) %>%
+#  dplyr::rename("Transported" = V1) %>%
+#  mutate(Transported=as.numeric(Transported)) %>%
+#  mutate(Transported=ifelse(Transported>.5,"True","False"))
 
-predictions_nn <- EHModel_Predict(n, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+#predictions_nn <- EHModel_Predict(n, dfTest5zz, predictionsColumnName = "Transported", #testData_IDColumn = "PassengerID")
 
-write_csv(predictions_nn, "C://Users//erico//Desktop//nn.csv")
+#write_csv(predictions_nn, "C://Users//erico//Desktop//nn.csv")
 
 ```
 
@@ -487,14 +489,14 @@ In order to address the long time until convergence (many hours), we experimente
 
 ```{r}
 
-pca <- prcomp(dfTrain5zz, center = TRUE,scale. = TRUE)
+pca <- prcomp(dfTrain5zz, center = TRUE, scale. = TRUE)
 
 summary(pca)
 plot(pca)
 
 ```
 
-### Tree Algorithms 1: Perform Random Forest: 34th Percentile
+### 3. Tree Algorithms 1: Perform Random Forest: 34th Percentile
 
 We begin with tree models.  Random forest is our first. We use the parallel library to run the model on multiple cores.
 
@@ -519,7 +521,7 @@ stopCluster(cl)
 
 ```
 
-### Tree Algorithms 2: Perform XGBoost Untuned: 73rd Percentile
+### 4. Tree Algorithms 2: Perform XGBoost Untuned: 73rd Percentile
 
 At the 34th percentile we need a more powerful model.  As an active learner, XGBoost is likely to fit our training model better than random forest, though it may overfit the data.  Our untuned model, with 55 rounds, achieves 80.2% accuracy and reaches the 74th percentile. 
 
@@ -575,7 +577,7 @@ write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds50.csv")
 
 ```
 
-### Hypertuning
+## Hypertuning
 
 
 ```{r}
