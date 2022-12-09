@@ -71,7 +71,7 @@ library(neuralnet)
 
 In machine learning, we predict target variables based on input variables. For this final exercise, we will apply various machine learning algorithms to a Kaggle data set (Spaceship Titanic) in order to predict which passengers have been transported to another dimension.
 
-While it’s tempting to throw as many algorithms at the problem as possible to see what sticks, the statistical fact is that while it is rare that a poor model will perform well on a holdout set, the chances of making false conclusions based on performance increases if we simply try one model after another.  Besides, if we don’t understand our model and our data, and the model becomes much more difficult to maintain.
+While it’s tempting to throw as many algorithms at the problem as possible to see what sticks, the statistical fact is that while it is rare that a poor model will perform well on a holdout set, the chances of making false conclusions based on performance increases if we simply try one model after another.  Besides, if we don’t understand our model and our data, and the model becomes much more difficult to troubleshoot and maintain.
 
 When choosing models, we are balancing simplicity and complexity, and therefore tendencies to underfit or overfit.  When the relationships in the data are simple and certain statistical conditions are met, parametric methods like OLS work well and have the advantage of being easily interpretable.  If, for example, we are predicting height from weight, the relationship is simple enough that we can create a linear regression model and capture most of the variation that can be explained for these two variables.
 
@@ -276,7 +276,7 @@ write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_FirstPass.csv")
 ```
 ## Data Preparation and Feature Engineering
 
-### 1. We create groups based on the Passenger ID
+### 1. Create groups based on the Passenger ID
 
 Passenger IDs are constructed to identify passengers travelling in groups.  We create groupings from the ID.
 
@@ -330,7 +330,7 @@ dfTest1 <- EHPrepare_MissingValues_Imputation(dfTestAA, impute="median")
 
 ```
 
-### 2. We Create Cabin Variables
+### 2. Create Cabin Variables
 
 Cabin variables consist of 3 parts in the form of a/b/c which indicate the location of the cabin on the ship. Here we extract out parts "a" and "c" - b appears to have no influence on the target.
 
@@ -352,7 +352,7 @@ dfTrain3 <- dfTrain2
 dfTest3 <- dfTest2
 ```
 
-### 3. We Create Dummy Variables
+### 3. Create Dummy Variables
 
 Now that we have engineered Cabin, we create dummy variables to handle category variables throughout the dataset.
 
@@ -421,8 +421,9 @@ We begin with Support Vector Machines and try three kernels - linear, poly and r
 
 ```{r}
 library(doParallel)
+library(caret)
 
-cl<-makePSOCKcluster(7)
+cl<-makePSOCKcluster(11)
   
 registerDoParallel(cl)
 
@@ -431,12 +432,27 @@ print("Linear: --------------------------------------")
 print("Poly: --------------------------------------")
 #poly <- EHModel_SVM(dfTrain5zz, "Transported", method="poly")
 print("Radial: --------------------------------------")
-rad <- EHModel_SVM(dfTrain5zz, "Transported", method="radial")
+#rad <- EHModel_SVM(dfTrain5zz, "Transported", method="radial")
 
 predictions_rad <- EHModel_Predict(rad$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
 predictions_rad$Transported <- ifelse(predictions_rad$Transported==1,"True","False")
 write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_Rad.csv")
+
+
+stopCluster(cl)
+
+```
+
+```{r}
+library(doParallel)
+library(caret)
+
+cl<-makePSOCKcluster(10)
+  
+registerDoParallel(cl)
+
+    svm <- train(Transported~., data=dfTrain5zz, method="svmRadial", preProcess = c("center","scale"), tuneGrid = expand.grid(C = seq(0.01, 2, length = 20), sigma=seq(0.25, 5)))
 
 stopCluster(cl)
 
@@ -579,6 +595,11 @@ write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds50.csv")
 
 ## Hypertuning
 
+### 1. Perform XGBoost Tuned: 78th Percentile
+
+1. Define business problem better
+2. Interpretation vs predicition - value of knowing the data
+3. Explain what was tuned - tune the svm
 
 ```{r}
 set.seed(100)
