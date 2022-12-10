@@ -423,7 +423,7 @@ We begin with Support Vector Machines and try three kernels - linear, poly and r
 library(doParallel)
 library(caret)
 
-cl<-makePSOCKcluster(11)
+cl<-makePSOCKcluster(7)
   
 registerDoParallel(cl)
 
@@ -436,25 +436,47 @@ print("Radial: --------------------------------------")
 
 predictions_rad <- EHModel_Predict(rad$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
+svmq <- train(Transported~., data=dfTrain5zz, method="svmPoly", preProcess = c("center","scale")) 
+
 predictions_rad$Transported <- ifelse(predictions_rad$Transported==1,"True","False")
-write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_Rad.csv")
+write_csv(predictions_rad, "C://Users//eric//Desktop//SVM_Rad.csv")
 
 
 stopCluster(cl)
 
+
 ```
+```{r}
+
+
+svmq
+```
+
 
 ```{r}
 library(doParallel)
 library(caret)
+devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
 
 cl<-makePSOCKcluster(10)
   
 registerDoParallel(cl)
 
-    svm <- train(Transported~., data=dfTrain5zz, method="svmRadial", preProcess = c("center","scale"), tuneGrid = expand.grid(C = seq(0.01, 2, length = 20), sigma=seq(0.25, 5)))
+#rad2 <- EHModel_SVM(dfTrain5zz, "Transported", method="radial", cValue=1, sigmaValue =.05)
+#predictions_rad2 <- EHModel_Predict(rad2$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+
+#predictions_rad2$Transported <- ifelse(predictions_rad2$Transported==1,"True","False")
+#write_csv(predictions_rad2, "C://Users//Eric//Desktop//SVM_Rad_HigherSigma.csv")
+
+rad3 <- EHModel_SVM(dfTrain5zz, "Transported", method="radial", cValue=1, sigmaValue =.04)
+predictions_rad3 <- EHModel_Predict(rad3$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+
+predictions_rad3$Transported <- ifelse(predictions_rad3$Transported==1,"True","False")
+write_csv(predictions_rad3, "C://Users//Eric//Desktop//SVM_Rad_LHigherSigma.csv")
 
 stopCluster(cl)
+rad2
 
 ```
 ### 2. Perform limited Neural Networks
