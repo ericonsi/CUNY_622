@@ -9,7 +9,7 @@ output:
     toc_depth: 4
 ---
 
-```{r setup, include=FALSE, warning=FALSE, message=FALSE}
+```{r setup, include=TRUE, warning=FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
 ```
 
@@ -102,17 +102,19 @@ In the year 2912, the Spaceship Titanic, an interstellar passenger liner with al
 ### Data Summary
 
 The data set consists of 8693 records and 13 variables, including spending on the ship’s various amenities (VR Deck, Spa, Room Service, Food Court, Shopping Mall, cabin number, whether the individual was traveling with the group, whether the individual was a VIP, planet of origin and destination, and so on. These columns map to some degree with the original Titanic database.
+
 The target variable, Transported, is roughly equally distributed between false (4315) and true (4378).
 
-#### Distributions
+Some of the numeric variables, particularly spending variables, are highly skewed - most passengers spend no money while a few spend a great deal. We can see that spending on luxuries (the spa, room service, etc.) is strongly negatively correlated with being transported - this supports the supposition that the rich were spared. Spending on more popular amenities like the food court and shopping mall are also negatively correlated but less so. Age has a small negative correlation as well.
+
+We decide not to log transform the numeric variables as normal distributions for predictors are not required by our models and interpretability suffers.
 
 #### Missing Values
 
 1073, or 12%, of records have missing values. The vast majority of missing values are found in the amenity expenditure columns.  Oddly, the amenity expenditure rows with missing values are completely independent of each other - there are no records where more than one of these values is missing.
+
 This may be an artifact of the fact that the data is manufactured.  In order to confirm that there is no systematic relationship between missing data and the target variable, we look at the Chi square between the target and a flag designating missing data.  We do this for each amenity expenditure column and find no relationship between missing data and the target variable.
 We therefore eliminate rows with missing values for the training set. The test set, we impute the median.
-
-#### Multicollinearity
 
 There is very little, even surprisingly little, multicollinearity in the database.  In the case of variables that track spending on amenities this is most surprising, and may suggest that passengers were working within a budget and only spent money on the activities they liked most.
 
@@ -126,11 +128,33 @@ All of the spending variables are highly skewed, with very large ending occurrin
 
 The data set holds a number of opportunities for feature engineering. Through testing, it was found that the following new features were significant in predicting transportation.  They are: 
 
+1. Groups - Passenger ID numbers suggest that some passengers boarded the ship as part of a group.  Although we could not establish that members of a group tended to meet the same fate, being a member of a group influenced whether a passenger was transported.
+
+2. Cabins - Cabin codes were parsed for location n the ship - this information was correlated with the target variable.
+
+3. Interaction variables - there were a number of interactions among variables which appeared when the variables were examined in isolation. We only retained one (group passengers were more likely to be transported if they shopped at the mall) because the others did not significantly increase accuracy when running the overall model - but there would be more to explore here.
+
 ### Modelling
 
 #### Choosing and Testing Models
 
+Understanding what models are doing and how is a key part of prediction. We compared tree models, svm, neural net, and linear regression.
+
+The first task is to understand the requirements of the business problem.  In this case, we have a partial roster of passengers where we know who was transported and who wasn’t.  As for the rest of the passengers, it’s our job to predict which of them were transported as well.  Insight into the data is only necessary insofar as it helps us make better predictions. Accuracy is our metric, as this is the metric used in the Kaggle (there is no penalty or false positives or false negatives which might suggest a different metric).   This suggests we should use the most complex model we can that has the highest accuracy.
+
+We used tenfold cross validation and compared models on the metric of accuracy – our results varied widely.  There was some, but not perfect, match between the accuracy predicted by the cross validation, and the accuracy achieved in the Kaggle.  For example, going on cross validation alone, the svm with the radial kernel underperformed compared to a linear and polynomial kernel - however, in the Kaggle it significantly outperformed both kernels.  Of course, without the Kaggle we would not have known this and would not have chosen the radial kernel to put into production.
+
+On the other hand, our best model (xgboost) also performed best on the Kaggle.  We suspect the neural net would have performed well also, but we did not have the computer power to hypertune it properly.
+
 #### Hyperparameter Tuning
+
+The caret package in R automatically hypertunes models on basic parameters and chooses the most optimal based on the metric determined by the user. With the exception of xgBoost, all of our models were tuned that way.  This left two tasks – tune xgBoost, and experiment with manual tuning of other models.
+
+The tuned xgBoost model (number of rounds was reduce from 55 to 14) increased accuracy from 79% to 80%, and improved our percentile position in the Kaggle from the 73rd to the 78th percentile.  
+
+The fact that our radial-kernal SVM had lower cross validation accuracy but higher Kaggle accuracy might have a number of different causes - but one is the possibility that there are idiosyncrasies in the training set that are not found in the Kaggle set.  In this case, we can increase sigma to decrease the risk of overfitting.   
+
+As we experimented by increasing sigma and decreasing sigma on the radial SVM model.  Reducing sigma (tighter fit) improved accuracy during cross validation, but not when applied to the Kaggle.  Because the differences were very small (.0026 improvement in accuracy), the models probably only varied by a handful of predictions. Increasing sigma (looser fit) reduced accuracy both in cross validation and on the Kaggle set.
 
 ### Results
 
@@ -148,33 +172,13 @@ In a sense, measuring performance in a Kaggle is a cheat - after a time the “u
 
 After an initial logistic regression, we improved performance in three ways:
 
-### The Importance of Knowing the Data
+1. Feature Engineering
+2. Model Selection
+3. Hypertuning
 
-Understanding the data is a key element in solid prediction. First, we needed to clean the data of anomalies (missing values, outliers, etc.). In our case, missing values appear to be at random and outliers didn’t present a problem.
+The exercise highlighted the importance of Understanding the data in solid and dependable prediction. First, we needed to clean the data of anomalies (missing values, outliers, etc.). In our case, missing values appear to be at random and outliers didn’t present a problem.
 
 Second, an understanding of the data highly conditioned our ability to perform feature engineering. Transported passengers tended to spend their money at the food court rather than get room service, they occupied lower-class cabins, and many of them were in cryosleep during the journey.  Knowing this helped us parse out cabin locations and discover interaction terms within the data.
-
-### The Importance of Choosing the Right Model
-
-Understanding what models are doing and how is a key part of prediction. We compared tree models, svm, neural net, and linear regression.
-
-The first task is to understand the requirements of the business problem.  In this case, we have a partial roster of passengers where we know who was transported and who wasn’t.  As for the rest of the passengers, it’s our job to predict which of them were transported as well.  Insight into the data is only necessary insofar as it helps us make better predictions. Accuracy is our metric, as this is the metric used in the Kaggle (there is no penalty or false positives or false negatives which might suggest a different metric).   This suggests we should use the most complex model we can that has the highest accuracy.
-
-We used tenfold cross validation and compared models on the metric of accuracy – our results varied widely.  There was some, but not perfect, match between the accuracy predicted by the cross validation, and the accuracy achieved in the Kaggle.  For example, going on cross validation alone, the svm with the radial kernel underperformed compared to a linear and polynomial kernel - however, in the Kaggle it significantly outperformed both kernels.  Of course, without the Kaggle we would not have known this and would not have chosen the radial kernel to put into production.
-
-On the other hand, our best model (xgboost) also performed best on the Kaggle.  We suspect the neural net would have performed well also, but we did not have the computer power to hypertune it properly.
-
-### The Importance of Hypertuning
-
-The caret package in R automatically hypertunes models on basic parameters and chooses the most optimal based on the metric determined by the user. With the exception of xgBoost, all of our models were tuned that way.  This left two tasks – tune xgBoost, and experiment with manual tuning of other models.
-
-The tuned xgBoost model (number of rounds was reduce from 55 to 14) increased accuracy from 79% to 80%, and improved our percentile position in the Kaggle from the 73rd to the 78th percentile.  
-
-The fact that our radial-kernal SVM had lower cross validation accuracy but higher Kaggle accuracy might have a number of different causes - but one is the possibility that there are idiosyncrasies in the training set that are not found in the Kaggle set.  In this case, we can increase sigma to decrease the risk of overfitting.   
-
-As we experimented by increasing sigma and decreasing sigma on the radial SVM model.  Reducing sigma (tighter fit) improved accuracy during cross validation, but not when applied to the Kaggle.  Because the differences were very small (.0026 improvement in accuracy), the models probably only varied by a handful of predictions. Increasing sigma (looser fit) reduced accuracy both in cross validation and on the Kaggle set.
-
-### Conclusion
 
 All of our models came in between 77% and 80% accuracy (based on a no information rate of 51%) after tenfold cross validation and optimal hypertuning.  This was also the range for individuals who submitted predictions in the Kaggle competition - and so a score of 77% achieved a much lower percentile in the competition than a score a few percentage points higher.  Without the Kaggle, we still would have chosen the xgBoost model, but if we were going to choose an SVM we would likely have chosen a less than optimal kernel.
 
@@ -221,7 +225,7 @@ dfTrain %>%
 
 ### B. Distributions: Skewedness and Outliers
 
-We at the distribution of all numeric variables.  Spending variables are highly skewed - most passengers spend no money while a few spend a great deal. We can see that spending on luxuries (the spa, room service, etc.) is strongly negatively correlated with being transported - this supports the supposition that the rich were spared. Spending on more popular amenities like the food court and shopping mall are also negatively correlated but less so. Age has a small negative correlation as well.
+We look at the distribution of all numeric variables.  Spending variables are highly skewed - most passengers spend no money while a few spend a great deal. We can see that spending on luxuries (the spa, room service, etc.) is strongly negatively correlated with being transported - this supports the supposition that the rich were spared. Spending on more popular amenities like the food court and shopping mall are also negatively correlated but less so. Age has a small negative correlation as well.
 
 We decide not to log transform the numeric variables as normal distributions for predictors are not required by our models and interpretability suffers.
 
@@ -436,7 +440,7 @@ dfTest5 <- cbind(PassengerID, dfTest5)
 ```
 ### 4.  Implement Interaction Features
 
-
+There were a number of interactions among variables which appeared when the variables were examined in isolation. We only retained one (group passengers were more likely to be transported if they shopped at the mall) because the others did not significantly increase accuracy when running the overall model - but there would be more to explore here.
 
 ```{r}
 
@@ -656,27 +660,25 @@ set.seed(100)
 cv <- xgb.cv(data = xgb_train, nrounds = 100, nthread = 2, nfold = 10, metrics = list("rmse","auc", "error"),
                   max_depth = 3, eta = 1, objective = "binary:logistic")
 print(cv)
-print(cv, verbose=TRUE)
+print(cv, verbose=FALSE)
 
 
-# Train a model using 14 rounds (corresponds to best iteration)
 trained_model <- xgb.train(data = xgb_train, max_depth = 3,
               eta = 1, nthread = 4, nrounds = 14,
               watchlist = list(train = xgb_train, eval = xgb_test),
               objective = "binary:logistic")
-# Get predictions
+
+
 head(predict(trained_model, xgb_train))
 ```
 
 ### 2. Tune SVM Radial: No Improvement
 
-We manually hypertune or svm radial model by increasing sigma (loosening the fit) and decreasing sigma (tightening the fit).  A decreased sigma increases accuracy on corss validation but not on the Kaggle.
+We manually hypertune our svm radial model by increasing sigma (loosening the fit) and decreasing sigma (tightening the fit).  A decreased sigma increased accuracy on cross validation but not on the Kaggle.
 
 ```{r}
 library(doParallel)
 library(caret)
-devtools::install_github("ericonsi/EHData", force=TRUE)
-library(EHData)
 
 cl<-makePSOCKcluster(10)
   
