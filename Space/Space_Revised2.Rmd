@@ -66,7 +66,12 @@ library(neuralnet)
 #library(mice)
 ```
 
-# Summary
+```{r}
+dfTable <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\622.csv")
+```
+
+
+# Discussion
 ## Introduction
 
 In machine learning, we predict target variables based on input variables. For this final exercise, we will apply various machine learning algorithms to a Kaggle data set (Spaceship Titanic) in order to predict which passengers have been transported to another dimension.
@@ -129,8 +134,59 @@ The data set holds a number of opportunities for feature engineering. Through te
 
 ### Results
 
+```{r}
+
+knitr::kable(dfTable)
+
+```
+
 ## Discussion
 
+For this exercise, we entered a Kaggle competition (Space Titanic) in order to make predictions and test their accuracy against other competition participants.  The target variable was whether or not a passenger was transported to another dimension while the ship was moving through a dangerous and destructive space anomaly.  We reached the 78th percentile, with an idea of further modifications which might help us do better.
+
+In a sense, measuring performance in a Kaggle is a cheat - after a time the “unknown” data in the Kaggle test set becomes increasingly “known” as you test more and more models against it. However, it also provides a real-world check on how well your model is actually performing.
+
+After an initial logistic regression, we improved performance in three ways:
+
+### The Importance of Knowing the Data
+
+Understanding the data is a key element in solid prediction. First, we needed to clean the data of anomalies (missing values, outliers, etc.). In our case, missing values appear to be at random and outliers didn’t present a problem.
+
+Second, an understanding of the data highly conditioned our ability to perform feature engineering. Transported passengers tended to spend their money at the food court rather than get room service, they occupied lower-class cabins, and many of them were in cryosleep during the journey.  Knowing this helped us parse out cabin locations and discover interaction terms within the data.
+
+### The Importance of Choosing the Right Model
+
+Understanding what models are doing and how is a key part of prediction. We compared tree models, svm, neural net, and linear regression.
+
+The first task is to understand the requirements of the business problem.  In this case, we have a partial roster of passengers where we know who was transported and who wasn’t.  As for the rest of the passengers, it’s our job to predict which of them were transported as well.  Insight into the data is only necessary insofar as it helps us make better predictions. Accuracy is our metric, as this is the metric used in the Kaggle (there is no penalty or false positives or false negatives which might suggest a different metric).   This suggests we should use the most complex model we can that has the highest accuracy.
+
+We used tenfold cross validation and compared models on the metric of accuracy – our results varied widely.  There was some, but not perfect, match between the accuracy predicted by the cross validation, and the accuracy achieved in the Kaggle.  For example, going on cross validation alone, the svm with the radial kernel underperformed compared to a linear and polynomial kernel - however, in the Kaggle it significantly outperformed both kernels.  Of course, without the Kaggle we would not have known this and would not have chosen the radial kernel to put into production.
+
+On the other hand, our best model (xgboost) also performed best on the Kaggle.  We suspect the neural net would have performed well also, but we did not have the computer power to hypertune it properly.
+
+### The Importance of Hypertuning
+
+The caret package in R automatically hypertunes models on basic parameters and chooses the most optimal based on the metric determined by the user. With the exception of xgBoost, all of our models were tuned that way.  This left two tasks – tune xgBoost, and experiment with manual tuning of other models.
+
+The tuned xgBoost model (number of rounds was reduce from 55 to 14) increased accuracy from 79% to 80%, and improved our percentile position in the Kaggle from the 73rd to the 78th percentile.  
+
+The fact that our radial-kernal SVM had lower cross validation accuracy but higher Kaggle accuracy might have a number of different causes - but one is the possibility that there are idiosyncrasies in the training set that are not found in the Kaggle set.  In this case, we can increase sigma to decrease the risk of overfitting.   
+
+As we experimented by increasing sigma and decreasing sigma on the radial SVM model.  Reducing sigma (tighter fit) improved accuracy during cross validation, but not when applied to the Kaggle.  Because the differences were very small (.0026 improvement in accuracy), the models probably only varied by a handful of predictions. Increasing sigma (looser fit) reduced accuracy both in cross validation and on the Kaggle set.
+
+### Conclusion
+
+All of our models came in between 77% and 80% accuracy (based on a no information rate of 51%) after tenfold cross validation and optimal hypertuning.  This was also the range for individuals who submitted predictions in the Kaggle competition - and so a score of 77% achieved a much lower percentile in the competition than a score a few percentage points higher.  Without the Kaggle, we still would have chosen the xgBoost model, but if we were going to choose an SVM we would likely have chosen a less than optimal kernel.
+
+While it makes sense that the boosted tree model outperforms the bagged tree model, it more difficult to speculate on why tree model forms better than the Support Vector Machine.  Given the small difference in accuracy between them (.003), it is possible that there is no significant difference, and that with slightly different feature engineering the SVM would be the better model.
+
+There would be a number of ways to improve accuracy even further:
+
+1.	Search for more features, particularly interaction features between cryosleep and spending, and understanding better how groupings and cabins work.
+2.	Borrow a more powerful computer to perform a properly tuned neural net, and then create a prediction set based on neural net, xgBoost and radial SVM.
+3.	Experiment more with manual tuning of models.
+
+In the meantime, however, we are satisfied with the nearly 80th percentile compared to the 26th percentile using logistical regression which we would have achieved prior to this class.
 
 ```{r}
 
@@ -139,6 +195,7 @@ The data set holds a number of opportunities for feature engineering. Through te
 
 dfTrain <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\train.csv")
 dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
+
 
 dfTrain$Transported = ifelse(dfTrain$Transported=="True",1,0)
 
@@ -379,6 +436,8 @@ dfTest5 <- cbind(PassengerID, dfTest5)
 ```
 ### 4.  Implement Interaction Features
 
+
+
 ```{r}
 
 dfTrain5$Inter_CountShop = dfTrain5$InAGroup*dfTrain5$ShoppingMall
@@ -417,7 +476,7 @@ Given the apparent complexity of the data shape, we turn to more complex nonpara
 
 ### 1. Perform SVM: 70th Percentile
 
-We begin with Support Vector Machines and try three kernels - linear, poly and radial.  Radial performs the best (accuracy=80.1%) and boosts us to the 70th percentile.
+We begin with Support Vector Machines and try three kernels - linear, poly and radial. We perform ten-fold cross validation and optimal hypertuning based on the caret package.  Radial performs the best (accuracy=80.1%) and boosts us to the 70th percentile.
 
 ```{r}
 library(doParallel)
@@ -428,57 +487,24 @@ cl<-makePSOCKcluster(7)
 registerDoParallel(cl)
 
 print("Linear: --------------------------------------")
-#lin <- EHModel_SVM(dfTrain5zz, "Transported", method="linear")
+lin <- EHModel_SVM(dfTrain5zz, "Transported", method="linear")
 print("Poly: --------------------------------------")
-#poly <- EHModel_SVM(dfTrain5zz, "Transported", method="poly")
+poly <- EHModel_SVM(dfTrain5zz, "Transported", method="poly")
 print("Radial: --------------------------------------")
-#rad <- EHModel_SVM(dfTrain5zz, "Transported", method="radial")
+rad <- EHModel_SVM(dfTrain5zz, "Transported", method="radial")
 
 predictions_rad <- EHModel_Predict(rad$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
-svmq <- train(Transported~., data=dfTrain5zz, method="svmPoly", preProcess = c("center","scale")) 
-
 predictions_rad$Transported <- ifelse(predictions_rad$Transported==1,"True","False")
-write_csv(predictions_rad, "C://Users//eric//Desktop//SVM_Rad.csv")
+write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_Rad.csv")
 
 
 stopCluster(cl)
 
 
 ```
-```{r}
 
 
-svmq
-```
-
-
-```{r}
-library(doParallel)
-library(caret)
-devtools::install_github("ericonsi/EHData", force=TRUE)
-library(EHData)
-
-cl<-makePSOCKcluster(10)
-  
-registerDoParallel(cl)
-
-#rad2 <- EHModel_SVM(dfTrain5zz, "Transported", method="radial", cValue=1, sigmaValue =.05)
-#predictions_rad2 <- EHModel_Predict(rad2$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
-
-#predictions_rad2$Transported <- ifelse(predictions_rad2$Transported==1,"True","False")
-#write_csv(predictions_rad2, "C://Users//Eric//Desktop//SVM_Rad_HigherSigma.csv")
-
-rad3 <- EHModel_SVM(dfTrain5zz, "Transported", method="radial", cValue=1, sigmaValue =.04)
-predictions_rad3 <- EHModel_Predict(rad3$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
-
-predictions_rad3$Transported <- ifelse(predictions_rad3$Transported==1,"True","False")
-write_csv(predictions_rad3, "C://Users//Eric//Desktop//SVM_Rad_LHigherSigma.csv")
-
-stopCluster(cl)
-rad2
-
-```
 ### 2. Perform limited Neural Networks
 
 Neural Networks require a great deal of computer resources and time.  A simple first pass with two hidden layers took a great deal of time, needed a high stepmax to converge and provided poor results (15th percentile).  The algorithm was therefore difficult to hypertune.
@@ -538,6 +564,8 @@ plot(pca)
 
 We begin with tree models.  Random forest is our first. We use the parallel library to run the model on multiple cores.
 
+We perform ten-fold cross validation and optimal hypertuning based on the caret package. 
+
 This improves accuracy on the test set to 78.7% which puts us in the 34th percentile
 
 ```{r}
@@ -561,7 +589,9 @@ stopCluster(cl)
 
 ### 4. Tree Algorithms 2: Perform XGBoost Untuned: 73rd Percentile
 
-At the 34th percentile we need a more powerful model.  As an active learner, XGBoost is likely to fit our training model better than random forest, though it may overfit the data.  Our untuned model, with 55 rounds, achieves 80.2% accuracy and reaches the 74th percentile. 
+At the 34th percentile we need a more powerful model.  As an active learner, XGBoost is likely to fit our training model better than random forest, though it may overfit the data.  
+
+Our untuned model, with 55 rounds, achieves 80.2% accuracy and reaches the 74th percentile. 
 
 ```{r}
 library(xgboost)
@@ -617,11 +647,9 @@ write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds50.csv")
 
 ## Hypertuning
 
-### 1. Perform XGBoost Tuned: 78th Percentile
+### 1. Tune XGBoost: 78th Percentile
 
-1. Define business problem better
-2. Interpretation vs predicition - value of knowing the data
-3. Explain what was tuned - tune the svm
+We perform ten-fold cross validation on 100 rounds and find the optimal nrounds for accuracy (14). Our  model, with 14 rounds, achieves 80.3% accuracy and reaches the 74th percentile. 
 
 ```{r}
 set.seed(100)
@@ -639,4 +667,38 @@ trained_model <- xgb.train(data = xgb_train, max_depth = 3,
 # Get predictions
 head(predict(trained_model, xgb_train))
 ```
+
+### 2. Tune SVM Radial: No Improvement
+
+We manually hypertune or svm radial model by increasing sigma (loosening the fit) and decreasing sigma (tightening the fit).  A decreased sigma increases accuracy on corss validation but not on the Kaggle.
+
+```{r}
+library(doParallel)
+library(caret)
+devtools::install_github("ericonsi/EHData", force=TRUE)
+library(EHData)
+
+cl<-makePSOCKcluster(10)
+  
+registerDoParallel(cl)
+
+#rad3 <- EHModel_SVM(dfTrain5zz, "Transported", method="radial", cValue=1, sigmaValue =.05)
+
+rad3 <- EHModel_SVM(dfTrain5zz, "Transported", method="radial", cValue=1, sigmaValue =.04)
+predictions_rad3 <- EHModel_Predict(rad3$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
+
+predictions_rad3$Transported <- ifelse(predictions_rad3$Transported==1,"True","False")
+write_csv(predictions_rad3, "C://Users//erico//Desktop//SVM_Rad_LHigherSigma.csv")
+
+stopCluster(cl)
+
+
+```
+
+## Discussion
+
+(see above)
+
+
+
 
