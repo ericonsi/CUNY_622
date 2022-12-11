@@ -2,7 +2,7 @@
 title: "Eric_Hirsch_622_Final_Assignment"
 subtitle: "Predicting the Space Titanic Kaggle Competition" 
 author: "Eric Hirsch"
-date: "12/3/2022"
+date: "12/11/2022"
 output:
   pdf_document:
     toc: true
@@ -10,7 +10,7 @@ output:
 ---
 
 ```{r setup, include=TRUE, warning=FALSE, message=FALSE}
-knitr::opts_chunk$set(echo = FALSE, warning =  FALSE, message = FALSE)
+knitr::opts_chunk$set(echo = TRUE, warning =  FALSE, message = FALSE)
 ```
 
 ```{r, include=FALSE}
@@ -99,7 +99,7 @@ The main disadvantages of this data set are that the data is made up and the sce
 
 In the year 2912, the Spaceship Titanic, an interstellar passenger liner with almost 13,000 passengers on board, collided with a spacetime anomaly hidden within a dust cloud.  Though the ship stayed intact, almost half of the passengers were transported to an alternate dimension.  Our job is to predict which passengers were transported by the anomaly using records recovered from the spaceship’s damaged computer system.
 
-### Data Summary
+### Data Summary and Preparation
 
 The data set consists of 8693 records and 13 variables, including spending on the ship’s various amenities (VR Deck, Spa, Room Service, Food Court, Shopping Mall, cabin number, whether the individual was traveling with the group, whether the individual was a VIP, planet of origin and destination, and so on. These columns map to some degree with the original Titanic database.
 
@@ -121,8 +121,6 @@ There is very little, even surprisingly little, multicollinearity in the databas
 #### Outliers
 
 All of the spending variables are highly skewed, with very large ending occurring at the very end of the distribution.   However, as most of our techniques are robust for outliers, records with extreme values remain in the database, as there is no reason to think that the spending is a data entry error or an anomalous occurrence.
-
-### Data Preparation
 
 #### Feature Engineering
 
@@ -194,8 +192,8 @@ In the meantime, however, we are satisfied with the nearly 80th percentile compa
 
 ```{r}
 
-#dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\train.csv")
-#dfTest <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\test.csv")
+#dfTrain <- read.csv("C:\\Users\\eric\\Documents\\R\\Space\\train.csv")
+#dfTest <- read.csv("C:\\Users\\eric\\Documents\\R\\Space\\test.csv")
 
 dfTrain <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\train.csv")
 dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
@@ -203,8 +201,8 @@ dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
 
 dfTrain$Transported = ifelse(dfTrain$Transported=="True",1,0)
 
-#dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\train.csv")
-#dfTest <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\test.csv")
+#dfTrain <- read.csv("C:\\Users\\eric\\Documents\\R\\Space\\train.csv")
+#dfTest <- read.csv("C:\\Users\\eric\\Documents\\R\\Space\\test.csv")
 ```
 
 # Code
@@ -332,7 +330,7 @@ q <- EHModel_Regression_Logistic(dfTrainNum, "Transported", returnLM = TRUE)
 predictions_logistic <- EHModel_Predict(q, dfTestNum, threshold=.5, testData_IDColumn = "PassengerID", predictionsColumnName = "Transported")
 
 predictions_logistic$Transported <- ifelse(predictions_logistic$Transported==1,"True","False")
-write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_FirstPass.csv")
+write_csv(predictions_logistic, "C://Users//eric//Desktop//LR_FirstPass.csv")
 
 ```
 ## Data Preparation and Feature Engineering
@@ -470,7 +468,7 @@ q <- EHModel_Regression_Logistic(dfTrain5zz, "Transported", returnLM = TRUE)
 predictions_logistic <- EHModel_Predict(q, dfTest5zz, threshold=.5, testData_IDColumn = "PassengerID", predictionsColumnName = "Transported")
 
 predictions_logistic$Transported <- ifelse(predictions_logistic$Transported==1,"True","False")
-write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_WithFeatures.csv")
+write_csv(predictions_logistic, "C://Users//eric//Desktop//LR_WithFeatures.csv")
 
 ```
 
@@ -500,7 +498,7 @@ rad <- EHModel_SVM(dfTrain5zz, "Transported", method="radial")
 predictions_rad <- EHModel_Predict(rad$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
 predictions_rad$Transported <- ifelse(predictions_rad$Transported==1,"True","False")
-write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_Rad.csv")
+write_csv(predictions_rad, "C://Users//eric//Desktop//SVM_Rad.csv")
 
 
 stopCluster(cl)
@@ -549,7 +547,7 @@ dfScale <- EHPrepare_ScaleAllButTarget(dfTrainN, "Transported")
 
 #predictions_nn <- EHModel_Predict(n, dfTest5zz, predictionsColumnName = "Transported", #testData_IDColumn = "PassengerID")
 
-#write_csv(predictions_nn, "C://Users//erico//Desktop//nn.csv")
+#write_csv(predictions_nn, "C://Users//eric//Desktop//nn.csv")
 
 ```
 
@@ -584,7 +582,7 @@ a <- EHModel_RandomForest(dfTrain5zz, "Transported")
 predictions_rf <- EHModel_Predict(a$rf, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
 predictions_rf$Transported <- ifelse(predictions_rf$Transported==1,"True","False")
-write_csv(predictions_rf, "C://Users//erico//Desktop//RF1.csv")
+write_csv(predictions_rf, "C://Users//eric//Desktop//RF1.csv")
 
   
 stopCluster(cl)
@@ -645,7 +643,7 @@ colnames(predictions) <- c("PassengerID", "Transported")
 predictions <- predictions %>%
   mutate(Transported=ifelse(Transported>.5,'True','False'))
 
-write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds50.csv")
+write_csv(predictions, "C:\\Users\\eric\\Desktop\\XGBpredictions_Rounds50.csv")
 
 ```
 
@@ -655,13 +653,10 @@ write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds50.csv")
 
 We perform ten-fold cross validation on 100 rounds and find the optimal nrounds for accuracy (14). Our  model, with 14 rounds, achieves 80.3% accuracy and reaches the 74th percentile. 
 
-```{r}
+```{r, message=FALSE, }
 set.seed(100)
 cv <- xgb.cv(data = xgb_train, nrounds = 100, nthread = 2, nfold = 10, metrics = list("rmse","auc", "error"),
                   max_depth = 3, eta = 1, objective = "binary:logistic")
-print(cv)
-print(cv, verbose=FALSE)
-
 
 trained_model <- xgb.train(data = xgb_train, max_depth = 3,
               eta = 1, nthread = 4, nrounds = 14,
@@ -690,7 +685,7 @@ rad3 <- EHModel_SVM(dfTrain5zz, "Transported", method="radial", cValue=1, sigmaV
 predictions_rad3 <- EHModel_Predict(rad3$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
 predictions_rad3$Transported <- ifelse(predictions_rad3$Transported==1,"True","False")
-write_csv(predictions_rad3, "C://Users//erico//Desktop//SVM_Rad_LHigherSigma.csv")
+write_csv(predictions_rad3, "C://Users//eric//Desktop//SVM_Rad_LHigherSigma.csv")
 
 stopCluster(cl)
 
