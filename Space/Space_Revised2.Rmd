@@ -63,7 +63,6 @@ library(mlbench)
 library(dplyr)
 library(magrittr)
 library(neuralnet)
-library(formattable)
 ```
 
 ```{r}
@@ -160,7 +159,7 @@ As we experimented by increasing sigma and decreasing sigma on the radial SVM mo
 
 ```{r}
 
-formattable(dfTable)
+knitr::kable(dfTable)
 
 ```
 
