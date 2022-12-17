@@ -132,6 +132,8 @@ The data set holds a number of opportunities for feature engineering. Through te
 
 3. Interaction variables - there were a number of interactions among variables which appeared when the variables were examined in isolation. We only retained one (group passengers were more likely to be transported if they shopped at the mall) because the others did not significantly increase accuracy when running the overall model - but there would be more to explore here.
 
+At this point, a picture of the transported passengers begins to emerge - they are the poorer passengers, most likely to shop on a budget or, even cheaper, spend the trip in cryosleep.  They tend to enter the ship in groups and inhabit lower class cabins.
+
 ### Modelling
 
 #### Choosing and Testing Models
@@ -235,7 +237,7 @@ EHSummarize_StandardPlots(dfTrainD, "Transported")
 
 ```
 
-Here we look at count plots for character variables.  Home and destination have an association with transported, but cryoSleep is especially important - over 75% of those in cryosleep were transported.
+Here we look at count plots for character variables.  Home and destination have an association with transported, but cryoSleep is especially important - over 75% of those in cryosleep (presumably a low budget option as food, drink and space are limited) were transported.
 
 ```{r}
 
@@ -312,7 +314,7 @@ print(chisq.test(table(dfMissingRecordsFlag_RoomService)))
 
 ### E. First Pass Logistic Regression:  9th percentile
 
-We perform a logistic regression with what we have and post to Kaggle just to get a baseline.  Accuracy on training is 77%, significantly better than the 51% no information rate, but gives us only 69% on the Kaggle set which puts us at the 9th percentile.
+We perform a logistic regression with what we have and post to Kaggle just to get a baseline.  Accuracy on training is 77%, significantly better than the 51% no information rate, but gives us only 69% on the Kaggle set (which puts us at the 9th percentile).
 
 ```{r}
 
@@ -339,7 +341,7 @@ write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_FirstPass.csv")
 
 Passenger IDs are constructed to identify passengers travelling in groups.  We create groupings from the ID.
 
-How likely is it that if the majority of members of a group transported, then they all transported? Only somewhat likely.  A histogram shows the distribution of percentages of transported within groups. Most often, half the members transported and half did not.  
+How likely is it that if the majority of members of a group were transported, then they all were transported? Only somewhat likely.  A histogram shows the distribution of percentages of transported within groups. Most often, half the members transported and half did not.  
 
 ```{r}
 
@@ -451,7 +453,7 @@ dfTest5$Inter_CountShop = dfTest5$InAGroup*dfTest5$ShoppingMall
 
 ### 5. Perform Logistic Regression With Engineered Features: 26th Percentile
 
-We perform a logistic regression with what we have and post to Kaggle just to get a baseline.  Accuracy on training is 79% (compared to 77% on the untransformed training set), but more importantly, this gives us only 78% on the Kaggle set which puts us at the 926th percentile.
+We perform a logistic regression with what we have and post to Kaggle just to get a baseline.  Accuracy on the holdout set improves training to 79% (compared to 77% on the untransformed regression), and gives us 78% on the Kaggle set, which puts us at the 26th percentile.
 
 ```{r}
 dfTrain5z <- dfTrain5
@@ -464,7 +466,7 @@ dfTest5z <- dfTest5
 dfTest5zz <- dfTest5z %>%
   dplyr::select(-count)
 
-set.seed(042756)
+set.seed(042758)
 
 q <- EHModel_Regression_Logistic(dfTrain5zz, "Transported", returnLM = TRUE)
 predictions_logistic <- EHModel_Predict(q, dfTest5zz, threshold=.5, testData_IDColumn = "PassengerID", predictionsColumnName = "Transported")
@@ -474,13 +476,15 @@ write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_WithFeatures.csv"
 
 ```
 
+At this point, a picture of the transported passengers begins to emerge - they are the poorer passengers, most likely to shop on a budget or, even cheaper, spend the trip in cryosleep.  They tend to enter the ship in groups and inhabit lower class cabins.
+
 ## More Complex Models
 
 Given the apparent complexity of the data shape, we turn to more complex nonparametric models to improve our predictions. 
 
 ### 1. Perform SVM: 70th Percentile
 
-We begin with Support Vector Machines and try three kernels - linear, poly and radial. We perform ten-fold cross validation and optimal hypertuning based on the caret package.  Radial performs the best (accuracy=80.1%) and boosts us to the 70th percentile.
+We begin with Support Vector Machines and try three kernels - linear, poly and radial. We perform ten-fold cross validation and optimal hypertuning of C based on the caret package.  Radial performs the best (accuracy=80.1% on the kaggle set) and boosts us to the 70th percentile.
 
 ```{r}
 library(doParallel)
@@ -553,7 +557,7 @@ dfScale <- EHPrepare_ScaleAllButTarget(dfTrainN, "Transported")
 
 ```
 
-In order to address the long time until convergence (many hours), we experimented with dimensionality reduction, but this was ineffective.  PCA, e.g., did not result in a small number of components taking the largest share of variance.  Taking a sample of records or  manually eliminating columns allowed for faster run times but hurt performance.  Below is the result of PCA analysis: 
+In order to address the long time until convergence (many hours), we experimented with dimensionality reduction, but this was ineffective.  PCA, e.g., did not result in a small number of components taking the largest share of variance.  Taking a sample of records ormanually eliminating columns allowed for faster run times but hurt performance.  Below is the result of PCA analysis: 
 
 ```{r}
 
@@ -566,11 +570,11 @@ plot(pca)
 
 ### 3. Tree Algorithms 1: Perform Random Forest: 34th Percentile
 
-We begin with tree models.  Random forest is our first. We use the parallel library to run the model on multiple cores.
+Random forest is our first tree. We use the parallel library to run the model on multiple cores.
 
-We perform ten-fold cross validation and optimal hypertuning based on the caret package. 
+We perform ten-fold cross validation and optimal hypertuning of sigma and c based on the caret package. 
 
-This improves accuracy on the test set to 78.7% which puts us in the 34th percentile
+This gives us 79% on the holdout set and 78.8% on the kaggle set, which puts us in the 34th percentile.  This is low compared to SVM.
 
 ```{r}
 library(doParallel)
@@ -595,7 +599,7 @@ stopCluster(cl)
 
 At the 34th percentile we need a more powerful model.  As an active learner, XGBoost is likely to fit our training model better than random forest, though it may overfit the data.  
 
-Our untuned model, with 55 rounds, achieves 80.2% accuracy and reaches the 74th percentile. 
+Our untuned model, with 55 rounds (chosen randomly), achieves 79% accuracy on the holdout set and 80.2% accuracy on the kaggle set, and reaches the 74th percentile. 
 
 ```{r}
 library(xgboost)
@@ -650,6 +654,8 @@ write_csv(predictions, "C:\\Users\\eric\\Desktop\\XGBpredictions_Rounds50.csv")
 
 ## Hypertuning
 
+Now we try some experiments with hypertuning.  First we choose a more optimal nrounds for xgboost.  Then we try manually adjusting sigma both up and down on our radial SVM model to see if that improves performance.
+
 ### 1. Tune XGBoost: 78th Percentile
 
 We perform ten-fold cross validation on 1-100 nrounds and find the optimal nrounds for accuracy (14). Our  model, with 14 rounds, achieves 80.3% accuracy and reaches the 74th percentile. 
@@ -673,7 +679,7 @@ write_csv(predictions, "C:\\Users\\eric\\Desktop\\XGBpredictions_Rounds14.csv")
 
 ### 2. Tune SVM Radial: No Improvement
 
-We manually hypertune our svm radial model by increasing sigma (loosening the fit) and decreasing sigma (tightening the fit).  A decreased sigma increased accuracy on cross validation but not on the Kaggle.
+We manually hypertune our svm radial model by increasing sigma (loosening the fit) and decreasing sigma (tightening the fit).  A decreased sigma increased accuracy on the holdout set but not on the Kaggle.
 
 ```{r}
 library(doParallel)
