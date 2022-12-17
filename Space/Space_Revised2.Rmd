@@ -194,8 +194,8 @@ In the meantime, however, we are satisfied with the nearly 80th percentile compa
 
 ```{r}
 
-#dfTrain <- read.csv("C:\\Users\\eric\\Documents\\R\\Space\\train.csv")
-#dfTest <- read.csv("C:\\Users\\eric\\Documents\\R\\Space\\test.csv")
+#dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\train.csv")
+#dfTest <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\test.csv")
 
 dfTrain <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\train.csv")
 dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
@@ -203,8 +203,8 @@ dfTest <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\test.csv")
 
 dfTrain$Transported = ifelse(dfTrain$Transported=="True",1,0)
 
-#dfTrain <- read.csv("C:\\Users\\eric\\Documents\\R\\Space\\train.csv")
-#dfTest <- read.csv("C:\\Users\\eric\\Documents\\R\\Space\\test.csv")
+#dfTrain <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\train.csv")
+#dfTest <- read.csv("C:\\Users\\erico\\Documents\\R\\Space\\test.csv")
 ```
 
 # Code
@@ -648,7 +648,7 @@ colnames(predictions) <- c("PassengerID", "Transported")
 predictions <- predictions %>%
   mutate(Transported=ifelse(Transported>.5,'True','False'))
 
-write_csv(predictions, "C:\\Users\\eric\\Desktop\\XGBpredictions_Rounds50.csv")
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds50.csv")
 
 ```
 
@@ -674,7 +674,7 @@ trained_model <- xgb.train(data = xgb_train, max_depth = 3,
 predictions <- predictions %>%
   mutate(Transported=ifelse(Transported>.5,'True','False'))
 
-write_csv(predictions, "C:\\Users\\eric\\Desktop\\XGBpredictions_Rounds14.csv")
+write_csv(predictions, "C:\\Users\\erico\\Desktop\\XGBpredictions_Rounds14.csv")
 ```
 
 ### 2. Tune SVM Radial: No Improvement
