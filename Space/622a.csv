@@ -1,0 +1,13 @@
+Model,Holdout Set Accuracy, Kaggle Accuracy, Kaggle Percentile
+XGBoost Tuned (14 Rounds),0.8,0.80383,78.2%
+XGBoost Untuned (55 Rounds),0.79,0.80243,73.8%
+SVM Rad,0.7715,0.80149,70.0%
+SVM Rad Lower Sigma,0.7741,0.80032,61.1%
+SVM Rad Higher Sigma,0.7669,0.79682,57.3%
+SVM Linear,0.78,0.79775,56.8%
+SVM Poly,0.78,0.79611,55.3%
+Random Forest,0.79,0.78793,34.5%
+Logistic Regression with feature engineering, 0.78,0.77975,26.2%
+Neural Net (severely limited due to computer power),0.76,0.77881,25.5%
+Logistic Regression without feature engineering,0.78,0.69227,9.5%
+

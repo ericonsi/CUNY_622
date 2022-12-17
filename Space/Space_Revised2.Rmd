@@ -63,11 +63,11 @@ library(mlbench)
 library(dplyr)
 library(magrittr)
 library(neuralnet)
-#library(mice)
+library(formattable)
 ```
 
 ```{r}
-dfTable <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\622.csv")
+dfTable <- read.csv("D:\\Rstudio\\Cuny_622\\Space\\622a.csv")
 ```
 
 
@@ -82,8 +82,9 @@ When choosing models, we are balancing simplicity and complexity, and therefore 
 
 When we increase our dimensions and/or complexity of relationships within the dataset, parametric methods are likely to underfit the data.  Even in our simple height and weight example, if the relationship between height and weight varies considerably at lower weights, medium weights and higher weights, spline regression or another nonparametric technique will be necessary. As dimensions and complexity increases, we adopt techniques that are more powerful at morphing the data shape so that we can model the underlying structure, such as trees, SVM and neural nets.
 
-Choosing the more complex algorithm will likely fit the training data better, but may be less interpretable and more subject to overfitting.  With this in mind, each of these techniques has its advantages and disadvantages. In my experience with earlier datasets in this class, trees will pick up autonomous clusters in the data set better than SVMs.  For example, if there were a small but significant anomalous cluster of individuals for whom height and weight were inversely related, trees will incorporate the cluster while SVMs will ignore it.  Of course, clusters like this might signal a missing variable, but not all of the necessary variables will be found in any given data set.  Trees may be bagged (e.g., Random Forest) or boosted (e.g. xgBoost) - either will generally perform better than a single decision tree.  Because xgBoost is not a lazy learner, it will often have the upper hand in fitting the training data.
-On the other hand, when the relationships are more systematic and class boundaries are clear, SVMs may perform better because the kernel trick allows SVMs to radically change the data shape in order to find the class boundary.  SVMs can also perform better when there is less data.
+Choosing the more complex algorithm will likely fit the training data better, but may be less interpretable and more subject to overfitting.  With this in mind, each of these techniques has its advantages and disadvantages. In my experience with earlier datasets in this class, trees will pick up autonomous clusters in the data set better than SVMs.  For example, if there were a small but significant anomalous cluster of individuals for whom height and weight were inversely related, trees will incorporate the cluster while SVMs will ignore it.  Of course, clusters like this might signal a missing variable, but not all of the necessary variables will be found in any given data set.  On the other hand, when the relationships are more systematic and class boundaries are clear, SVMs may perform better because the kernel trick allows SVMs to radically change the data shape in order to find the class boundary.  SVMs can also perform better when there is less data.
+
+While decision trees are powerful, they are generally more so when bagged (e.g., Random Forest) or boosted (e.g. xgBoost).  Because xgBoost is an active learner, it will often have the upper hand in fitting the training data.
 
 One of the biggest advantages of neural networks is that they effectively do the feature engineering for you if you can apply enough layers.  They are also subject to the “double descent” phenomenon, which helps with managing underfitting.  However, for a student using a home computer like myself, it’s often impractical to take advantage of these facts as the algorithm would run too long.  Neural networks, like SVMs, also powerfully change the data shape in order to find class boundaries.  
 
@@ -91,36 +92,35 @@ Accurate prediction depends not only on algorithm choice. We also need to engine
 
 ## Prediction using the Kaggle Spaceship Titanic Data Set
 
-For this exercise I’ve chosen a Kaggle Competition – the Kaggle Spaceship data set.  The advantages of using this a competition data set are that we can compare our performance those of others. Achieving 90% on a holdout set in and of itself tells us nothing - we don’t know if achieving 95% would have been easy or impossible. In this competition, the 2,000 or so submitted accuracies on the leaderboard range from about 76% to 82%, which gives us a good idea of how well our model is working.
+For this exercise I’ve chosen a Kaggle Competition – the Kaggle Spaceship data set.  The advantages of using this a competition data set are that we can compare our performance to those of others. Achieving 90% on a holdout set in and of itself tells us nothing - we don’t know if achieving 95% would have been easy or impossible. In this competition, the 2,000 or so submitted accuracies on the leaderboard range from about 76% to 82%, which can give us a good idea of how well our model is working.
 
-The main disadvantages of this data set are that the data is made up and the scenario a bit far-fetched. However, I wanted a data set that had a simple class as a target, as opposed to an image example, and the standard Titanic data set has been over analyzed, this was one of the few good choices.
+The main disadvantages of this data set are that the data is made up and the scenario a bit far-fetched. However, I wanted a data set that had a simple class as a target, as opposed to an image example.  The standard Titanic data set has been over analyzed, so this was one of the few good choices left.
 
 ### The Business Problem
 
-In the year 2912, the Spaceship Titanic, an interstellar passenger liner with almost 13,000 passengers on board, collided with a spacetime anomaly hidden within a dust cloud.  Though the ship stayed intact, almost half of the passengers were transported to an alternate dimension.  Our job is to predict which passengers were transported by the anomaly using records recovered from the spaceship’s damaged computer system.
+In the year 2912, the Spaceship Titanic, an interstellar passenger liner with almost 13,000 passengers on board, collided with a spacetime anomaly hidden within a dust cloud.  Though the ship stayed intact, almost half of the passengers were transported to an alternate dimension.  Our job is to predict which passengers were transported by the anomaly using a set of partial records recovered from the spaceship’s damaged computer system.
 
 ### Data Summary and Preparation
 
-The data set consists of 8693 records and 13 variables, including spending on the ship’s various amenities (VR Deck, Spa, Room Service, Food Court, Shopping Mall, cabin number, whether the individual was traveling with the group, whether the individual was a VIP, planet of origin and destination, and so on. These columns map to some degree with the original Titanic database.
+The data set consists of 8693 records and 13 variables, including spending on the ship’s various amenities (VR Deck, Spa, Room Service, Food Court, and Shopping Mall), cabin number, whether the individual was traveling with the group, whether the individual was a VIP, planet of origin and destination, and so on. These columns map to some degree with the original Titanic database.
 
 The target variable, Transported, is roughly equally distributed between false (4315) and true (4378).
 
-Some of the numeric variables, particularly spending variables, are highly skewed - most passengers spend no money while a few spend a great deal. We can see that spending on luxuries (the spa, room service, etc.) is strongly negatively correlated with being transported - this supports the supposition that the rich were spared. Spending on more popular amenities like the food court and shopping mall are also negatively correlated but less so. Age has a small negative correlation as well.
+Some of the numeric variables, particularly spending variables, are highly skewed - most passengers spend no money while a few spend a great deal. We can see that spending on luxuries (the spa, room service, etc.) is strongly negatively correlated with being transported - this supports the supposition that the rich were spared. Spending on more budget--friandly amenities like the food court and shopping mall are also negatively correlated but less so. Age has a small negative correlation as well.
 
 We decide not to log transform the numeric variables as normal distributions for predictors are not required by our models and interpretability suffers.
 
 #### Missing Values
 
-1073, or 12%, of records have missing values. The vast majority of missing values are found in the amenity expenditure columns.  Oddly, the amenity expenditure rows with missing values are completely independent of each other - there are no records where more than one of these values is missing.
+1073, or 12%, of records have missing values. The vast majority of missing values are found in the amenity expenditure columns.  Oddly, the amenity expenditure rows with missing values are completely independent of each other - there are almost no records where more than one of these values is missing.
 
-This may be an artifact of the fact that the data is manufactured.  In order to confirm that there is no systematic relationship between missing data and the target variable, we look at the Chi square between the target and a flag designating missing data.  We do this for each amenity expenditure column and find no relationship between missing data and the target variable.
-We therefore eliminate rows with missing values for the training set. The test set, we impute the median.
+This may be an artifact of the fact that the data is manufactured.  In order to confirm that there is no systematic relationship between missing data and the target variable, we look at the Chi square between the target and a flag designating missing data.  We do this for each amenity expenditure column and find no relationship between missing data and the target variable. We therefore eliminate rows with missing values for the training set. For the test set, we impute the median.
 
 There is very little, even surprisingly little, multicollinearity in the database.  In the case of variables that track spending on amenities this is most surprising, and may suggest that passengers were working within a budget and only spent money on the activities they liked most.
 
 #### Outliers
 
-All of the spending variables are highly skewed, with very large ending occurring at the very end of the distribution.   However, as most of our techniques are robust for outliers, records with extreme values remain in the database, as there is no reason to think that the spending is a data entry error or an anomalous occurrence.
+All of the spending variables are highly skewed, with very large instances occurring at the very end of the distribution.   However, as most of our techniques are robust for outliers, records with extreme values remain in the database, as there is no reason to think that the spending is a data entry error or an anomalous occurrence.
 
 #### Feature Engineering
 
@@ -136,13 +136,13 @@ The data set holds a number of opportunities for feature engineering. Through te
 
 #### Choosing and Testing Models
 
-Understanding what models are doing and how is a key part of prediction. We compared tree models, svm, neural net, and linear regression.
+Understanding what models are doing and how is a key part of prediction. We compared tree models, svm, neural net, and logistic regression.
 
-The first task is to understand the requirements of the business problem.  In this case, we have a partial roster of passengers where we know who was transported and who wasn’t.  As for the rest of the passengers, it’s our job to predict which of them were transported as well.  Insight into the data is only necessary insofar as it helps us make better predictions. Accuracy is our metric, as this is the metric used in the Kaggle (there is no penalty or false positives or false negatives which might suggest a different metric).   This suggests we should use the most complex model we can that has the highest accuracy.
+The first task is to understand the requirements of the business problem.  In this case, we have a partial roster of passengers where we know who was transported and who wasn’t.  As for the rest of the passengers, it is our job to predict which of them were transported as well.  Insight into the data is necessary insofar as it helps us make better predictions, but we need no more from the data than that. Accuracy is our metric, as this is the metric used in the Kaggle (e.g., there is no penalty for false positives or false negatives which might suggest a different metric).  This suggests we should use the most complex model we can that has the highest accuracy.
 
 We used tenfold cross validation and compared models on the metric of accuracy – our results varied widely.  There was some, but not perfect, match between the accuracy predicted by the cross validation, and the accuracy achieved in the Kaggle.  For example, going on cross validation alone, the svm with the radial kernel underperformed compared to a linear and polynomial kernel - however, in the Kaggle it significantly outperformed both kernels.  Of course, without the Kaggle we would not have known this and would not have chosen the radial kernel to put into production.
 
-On the other hand, our best model (xgboost) also performed best on the Kaggle.  We suspect the neural net would have performed well also, but we did not have the computer power to hypertune it properly.
+On the other hand, our best model on cross validation (xgboost) also performed best on the Kaggle.  We suspect the neural net would have performed well also, but we did not have the computer power to hypertune it properly.
 
 #### Hyperparameter Tuning
 
@@ -158,7 +158,7 @@ As we experimented by increasing sigma and decreasing sigma on the radial SVM mo
 
 ```{r}
 
-knitr::kable(dfTable)
+formattable(dfTable)
 
 ```
 
@@ -180,7 +180,7 @@ Second, an understanding of the data highly conditioned our ability to perform f
 
 All of our models came in between 77% and 80% accuracy (based on a no information rate of 51%) after tenfold cross validation and optimal hypertuning.  This was also the range for individuals who submitted predictions in the Kaggle competition - and so a score of 77% achieved a much lower percentile in the competition than a score a few percentage points higher.  Without the Kaggle, we still would have chosen the xgBoost model, but if we were going to choose an SVM we would likely have chosen a less than optimal kernel.
 
-While it makes sense that the boosted tree model outperforms the bagged tree model, it more difficult to speculate on why tree model forms better than the Support Vector Machine.  Given the small difference in accuracy between them (.003), it is possible that there is no significant difference, and that with slightly different feature engineering the SVM would be the better model.
+While it makes sense that the boosted tree model outperforms the bagged tree model, it more difficult to speculate on why tree models perform better than the Support Vector Machines.  Given the small difference in accuracy between them (.003), it is possible that there is no significant difference, and that with slightly different feature engineering the SVM would be the better model.
 
 There would be a number of ways to improve accuracy even further:
 
@@ -330,7 +330,7 @@ q <- EHModel_Regression_Logistic(dfTrainNum, "Transported", returnLM = TRUE)
 predictions_logistic <- EHModel_Predict(q, dfTestNum, threshold=.5, testData_IDColumn = "PassengerID", predictionsColumnName = "Transported")
 
 predictions_logistic$Transported <- ifelse(predictions_logistic$Transported==1,"True","False")
-write_csv(predictions_logistic, "C://Users//eric//Desktop//LR_FirstPass.csv")
+write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_FirstPass.csv")
 
 ```
 ## Data Preparation and Feature Engineering
@@ -464,11 +464,13 @@ dfTest5z <- dfTest5
 dfTest5zz <- dfTest5z %>%
   dplyr::select(-count)
 
+set.seed(042756)
+
 q <- EHModel_Regression_Logistic(dfTrain5zz, "Transported", returnLM = TRUE)
 predictions_logistic <- EHModel_Predict(q, dfTest5zz, threshold=.5, testData_IDColumn = "PassengerID", predictionsColumnName = "Transported")
 
 predictions_logistic$Transported <- ifelse(predictions_logistic$Transported==1,"True","False")
-write_csv(predictions_logistic, "C://Users//eric//Desktop//LR_WithFeatures.csv")
+write_csv(predictions_logistic, "C://Users//erico//Desktop//LR_WithFeatures.csv")
 
 ```
 
@@ -498,7 +500,7 @@ rad <- EHModel_SVM(dfTrain5zz, "Transported", method="radial")
 predictions_rad <- EHModel_Predict(rad$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
 predictions_rad$Transported <- ifelse(predictions_rad$Transported==1,"True","False")
-write_csv(predictions_rad, "C://Users//eric//Desktop//SVM_Rad.csv")
+write_csv(predictions_rad, "C://Users//erico//Desktop//SVM_Rad.csv")
 
 
 stopCluster(cl)
@@ -547,7 +549,7 @@ dfScale <- EHPrepare_ScaleAllButTarget(dfTrainN, "Transported")
 
 #predictions_nn <- EHModel_Predict(n, dfTest5zz, predictionsColumnName = "Transported", #testData_IDColumn = "PassengerID")
 
-#write_csv(predictions_nn, "C://Users//eric//Desktop//nn.csv")
+#write_csv(predictions_nn, "C://Users//erico//Desktop//nn.csv")
 
 ```
 
@@ -582,7 +584,7 @@ a <- EHModel_RandomForest(dfTrain5zz, "Transported")
 predictions_rf <- EHModel_Predict(a$rf, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
 predictions_rf$Transported <- ifelse(predictions_rf$Transported==1,"True","False")
-write_csv(predictions_rf, "C://Users//eric//Desktop//RF1.csv")
+write_csv(predictions_rf, "C://Users//erico//Desktop//RF1.csv")
 
   
 stopCluster(cl)
@@ -621,11 +623,10 @@ test_x <- dfTest6 %>%
 test_y <- dfTest6 %>%
   dplyr::select(Transported)
 
-#define final training and testing sets
+
 xgb_train <- xgb.DMatrix(data = as.matrix(train_x), label = as.matrix(train_y))
 xgb_test <- xgb.DMatrix(data = as.matrix(test_x), label = as.matrix(test_y))
 
-#tRIAL AND ERROR GAVE 14 AS BEST with max.depth at 3 - COULD TRY OTHERS
 #depth of 1000 and nrounds 100000 showed no double descent
 
 model2 <- xgb.train(data = xgb_train, max.depth = 3, nrounds = 50)
@@ -651,7 +652,7 @@ write_csv(predictions, "C:\\Users\\eric\\Desktop\\XGBpredictions_Rounds50.csv")
 
 ### 1. Tune XGBoost: 78th Percentile
 
-We perform ten-fold cross validation on 100 rounds and find the optimal nrounds for accuracy (14). Our  model, with 14 rounds, achieves 80.3% accuracy and reaches the 74th percentile. 
+We perform ten-fold cross validation on 1-100 nrounds and find the optimal nrounds for accuracy (14). Our  model, with 14 rounds, achieves 80.3% accuracy and reaches the 74th percentile. 
 
 ```{r, message=FALSE, }
 set.seed(100)
@@ -664,7 +665,10 @@ trained_model <- xgb.train(data = xgb_train, max_depth = 3,
               objective = "binary:logistic")
 
 
-head(predict(trained_model, xgb_train))
+predictions <- predictions %>%
+  mutate(Transported=ifelse(Transported>.5,'True','False'))
+
+write_csv(predictions, "C:\\Users\\eric\\Desktop\\XGBpredictions_Rounds14.csv")
 ```
 
 ### 2. Tune SVM Radial: No Improvement
@@ -685,7 +689,7 @@ rad3 <- EHModel_SVM(dfTrain5zz, "Transported", method="radial", cValue=1, sigmaV
 predictions_rad3 <- EHModel_Predict(rad3$svm, dfTest5zz, predictionsColumnName = "Transported", testData_IDColumn = "PassengerID")
 
 predictions_rad3$Transported <- ifelse(predictions_rad3$Transported==1,"True","False")
-write_csv(predictions_rad3, "C://Users//eric//Desktop//SVM_Rad_LHigherSigma.csv")
+write_csv(predictions_rad3, "C://Users//erico//Desktop//SVM_Rad_LHigherSigma.csv")
 
 stopCluster(cl)
 
